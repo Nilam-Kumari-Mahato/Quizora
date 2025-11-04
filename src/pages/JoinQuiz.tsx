@@ -68,7 +68,7 @@ const JoinQuiz = () => {
 
   if (joined) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-accent/10 flex items-center justify-center p-4">
         <div className="w-full max-w-2xl space-y-8">
           <div className="text-center space-y-4">
             <div className="inline-block p-4 bg-primary/10 rounded-full mb-4 animate-pulse">
@@ -119,14 +119,14 @@ const JoinQuiz = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-accent/10 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8 bg-card border-border rounded-3xl">
         <Button
           variant="ghost"
           onClick={() => navigate('/')}
-          className="mb-6 text-primary hover:text-primary hover:bg-primary/10"
+          className="mb-6 text-primary hover:text-primary hover:bg-primary/10 hover: rounded-full"
         >
-          <ArrowLeft className="mr-2 h-4 w-4" />
+          <ArrowLeft className=" h-4 w-4" />
           Back
         </Button>
 
@@ -146,7 +146,7 @@ const JoinQuiz = () => {
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="Enter code (try 1234)"
               maxLength={6}
-              className="mt-2 text-center text-2xl font-bold tracking-widest bg-input border-border text-primary"
+              className="mt-2 text-center text-xl font-bold tracking-widest rounded-xl bg-input border-border "
             />
           </div>
 
@@ -157,7 +157,7 @@ const JoinQuiz = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter your name"
-              className="mt-2 bg-input border-border text-foreground"
+              className="mt-2 bg-input border-border rounded-xl text-foreground"
             />
           </div>
 
@@ -166,7 +166,7 @@ const JoinQuiz = () => {
               onClick={joinQuiz}
               disabled={loading}
               size="lg"
-              className="w-48 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
+              className="w-48 bg-primary text-primary-foreground hover:bg-primary/80 rounded-full"
             >
               {loading ? "Joining..." : "Join Quiz"}
             </Button>

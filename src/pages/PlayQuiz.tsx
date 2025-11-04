@@ -99,8 +99,8 @@ const PlayQuiz = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-accent/10 p-4">
-      <div className="container max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-accent/10 pt-4 pb-4">
+      <div className="container max-w-md sm:max-w-2xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl">
         <Card className="p-6 mb-6">
           <div className="flex justify-between items-center">
             <div>
@@ -109,7 +109,7 @@ const PlayQuiz = () => {
             </div>
             <div className="text-right">
               <p className="text-sm text-muted-foreground">Your Score</p>
-              <p className="text-2xl font-bold text-primary">{participant?.score || 0}</p>
+              <p className="text-xl font-bold text-primary">{participant?.score || 0}</p>
             </div>
           </div>
         </Card>
@@ -144,7 +144,7 @@ const PlayQuiz = () => {
               )}
             </div>
 
-            <div className="space-y-3 mb-5">
+            <div className="space-y-2 mb-5">
               {['A', 'B', 'C', 'D'].map(option => {
                 const optionText = currentQuestion[`option_${option.toLowerCase()}`];
                 if (!optionText) return null;
