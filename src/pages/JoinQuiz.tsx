@@ -146,7 +146,7 @@ const JoinQuiz = () => {
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="Enter code (try 1234)"
               maxLength={6}
-              className="mt-2 text-center text-xl font-bold tracking-widest rounded-xl bg-input border-border "
+              className="mt-2 text-center text-xl font-bold tracking-widest rounded-xl bg-input border-border placeholder:text-xs md:placeholder:text-sm"
             />
           </div>
 
