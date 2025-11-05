@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AuthButtons } from "@/components/AuthButtons"; 
 import Index from "./pages/Index";
 import CreateQuiz from "./pages/CreateQuiz";
 import JoinQuiz from "./pages/JoinQuiz";
@@ -22,6 +23,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <ThemeToggle />
+        <AuthButtons /> {/* <-- 2. ADDED */}
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />

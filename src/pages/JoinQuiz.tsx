@@ -5,7 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Users, Clock } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { useMutation } from "convex/react"; // 1. Import useMutation
+import { api } from "../../convex/_generated/api"; // 2. Import api
 
 const JoinQuiz = () => {
   const navigate = useNavigate();
@@ -13,8 +15,9 @@ const JoinQuiz = () => {
   const [loading, setLoading] = useState(false);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
-  const [joined, setJoined] = useState(false);
-  const [participantCount, setParticipantCount] = useState(1);
+
+  // 3. Get the joinSession mutation
+  const joinSessionMutation = useMutation(api.sessions.joinSession);
 
   const joinQuiz = async () => {
     if (!code.trim() || !name.trim()) {
@@ -26,97 +29,30 @@ const JoinQuiz = () => {
       return;
     }
 
-    // For demo purposes, check if code is "1234"
-    if (code.toUpperCase() !== "1234") {
-      toast({ 
-        title: "Invalid Code", 
-        description: "Quiz code not found. Try '1234' for demo.",
-        variant: "destructive" 
-      });
-      return;
-    }
-
     setLoading(true);
     try {
-      // TODO: Replace with your backend API call
-      // const response = await fetch(`/api/sessions/join`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ code: code.toUpperCase(), name })
-      // });
-      // const data = await response.json();
+      // 4. Call the mutation
+      const { sessionId, participantId } = await joinSessionMutation({
+        join_code: code.toUpperCase(),
+        name: name,
+      });
       
-      // Simulate joining - Auto-start quiz for code 1234
-      setTimeout(() => {
-        setLoading(false);
-        if (code === "1234") {
-          navigate(`/play/session-1234?participant=${name}`);
-        } else {
-          setJoined(true);
-          setParticipantCount(Math.floor(Math.random() * 10) + 1);
-        }
-      }, 1000);
+      // 5. Navigate to the play screen on success
+      navigate(`/play/${sessionId}?participant=${participantId}`);
+
     } catch (error: any) {
       toast({ 
-        title: "Error", 
-        description: error.message,
+        title: "Failed to Join", 
+        description: `Error: ${error.message}`, // Show the real error
         variant: "destructive" 
       });
+    } finally {
       setLoading(false);
     }
   };
 
-  if (joined) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-accent/10 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl space-y-8">
-          <div className="text-center space-y-4">
-            <div className="inline-block p-4 bg-primary/10 rounded-full mb-4 animate-pulse">
-              <Clock className="w-16 h-16 text-primary" />
-            </div>
-            <h1 className="text-5xl font-bold text-primary">
-              Welcome, {name}!
-            </h1>
-            <p className="text-2xl text-muted-foreground">
-              Waiting for host to start the quiz...
-            </p>
-          </div>
-
-          <Card className="p-8 bg-card border-border">
-            <div className="flex items-center justify-center gap-8">
-              <div className="text-center">
-                <Users className="w-12 h-12 text-primary mx-auto mb-3" />
-                <p className="text-5xl font-bold text-primary mb-2">
-                  {participantCount}
-                </p>
-                <p className="text-lg text-muted-foreground">
-                  Participants Joined
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          <div className="text-center">
-            <p className="text-muted-foreground mb-4">
-              Quiz Code: <span className="text-2xl font-bold text-primary">{code}</span>
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setJoined(false);
-                setCode("");
-                setName("");
-              }}
-              className="border-primary text-primary hover:bg-primary hover:text-background"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Leave Quiz
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // 6. The "waiting" screen logic has been removed.
+  // The PlayQuiz page will now handle all states: waiting, active, and finished.
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-accent/10 flex items-center justify-center p-4">
@@ -168,7 +104,11 @@ const JoinQuiz = () => {
               size="lg"
               className="w-48 bg-primary text-primary-foreground hover:bg-primary/80 rounded-full border border-primary-foreground-30"
             >
-              {loading ? "Joining..." : "Join Quiz"}
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+              ) : (
+                "Join Quiz"
+              )}
             </Button>
           </div>
         </div>

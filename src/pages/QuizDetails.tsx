@@ -1,81 +1,85 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Play, Copy, CheckCircle } from "lucide-react";
+import { ArrowLeft, Play, Copy, CheckCircle, Loader2 } from "lucide-react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { Id } from "../../convex/_generated/dataModel"; // <-- This import is needed
 
 const QuizDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [quiz, setQuiz] = useState<any>({
-    title: "Sample Quiz",
-    description: "This is a sample quiz to demonstrate the UI"
-  });
-  const [questions, setQuestions] = useState<any[]>([
-    {
-      id: 1,
-      question_text: "Sample Question 1",
-      time_limit: 30,
-      option_a: "Option A",
-      option_b: "Option B",
-      option_c: "Option C",
-      option_d: "Option D",
-      correct_answer: "A"
-    },
-    {
-      id: 2,
-      question_text: "Sample Question 2",
-      time_limit: 45,
-      option_a: "Option A",
-      option_b: "Option B",
-      option_c: "",
-      option_d: "",
-      correct_answer: "B"
-    }
-  ]);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    // TODO: Replace with your backend API call
-    // fetch(`/api/quizzes/${id}`)
-    //   .then(res => res.json())
-    //   .then(data => {
-    //     setQuiz(data.quiz);
-    //     setQuestions(data.questions);
-    //   });
-  }, [id]);
+  // Fetch quiz data, casting the 'id' string to Id<"quizzes">
+  const quizData = useQuery(
+    api.quizzes.getQuizDetails, 
+    id ? { id: id as Id<"quizzes"> } : "skip"
+  );
+  const quiz = quizData?.quiz;
+  const questions = quizData?.questions;
+
+  // Get the createSession mutation
+  const createSessionMutation = useMutation(api.sessions.createSession);
 
   const startQuiz = async () => {
+    if (!id) return;
     setLoading(true);
     try {
-      // TODO: Replace with your backend API call
-      // const response = await fetch('/api/sessions', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ quizId: id })
-      // });
-      // const session = await response.json();
-      // navigate(`/host/${session.id}`);
-
-      toast({ title: "Starting quiz..." });
+      // Call the mutation, casting the 'id' string
+      const sessionId = await createSessionMutation({
+        quizId: id as Id<"quizzes">, 
+      });
+      
+      // Navigate to the host page
+      navigate(`/host/${sessionId}`);
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Error", description: `Failed to start quiz: ${error.message}`, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
   const copyQuizLink = () => {
-    const link = `${window.location.origin}/quiz/${id}`;
+    const link = window.location.href; // Use current URL
     navigator.clipboard.writeText(link);
     setCopied(true);
     toast({ title: "Link Copied!", description: "Share this link with others" });
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Handle loading state while fetching data
+  if (quizData === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin" />
+      </div>
+    );
+  }
+
+  // Handle quiz not found
+  if (quizData === null) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <h1 className="text-4xl font-bold mb-4">Quiz Not Found</h1>
+        <Button
+          variant="ghost"
+          onClick={() => navigate('/')}
+          className="mb-6"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Home
+        </Button>
+      </div>
+    );
+  }
+
+  // Auth logic removed
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/5 py-8">
       <div className="container max-w-4xl mx-auto px-4">
@@ -97,13 +101,18 @@ const QuizDetails = () => {
           )}
 
           <div className="flex gap-4">
+            {/* "Start Quiz" button is now always visible */}
             <Button
               onClick={startQuiz}
               disabled={loading}
               size="lg"
               className="bg-gradient-to-r from-primary to-secondary"
             >
-              <Play className="mr-2 h-5 w-5" />
+              {loading ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Play className="mr-2 h-5 w-5" />
+              )}
               Start Quiz
             </Button>
             <Button
@@ -126,10 +135,10 @@ const QuizDetails = () => {
           </div>
         </Card>
 
-        <h2 className="text-2xl font-bold mb-4">Questions ({questions.length})</h2>
+        <h2 className="text-2xl font-bold mb-4">Questions ({questions?.length || 0})</h2>
         <div className="space-y-4">
-          {questions.map((question, index) => (
-            <Card key={question.id} className="p-6">
+          {questions?.map((question, index) => (
+            <Card key={question._id} className="p-6">
               <div className="flex justify-between items-start mb-3">
                 <h3 className="font-semibold text-lg">Question {index + 1}</h3>
                 <span className="text-sm text-muted-foreground">{question.time_limit}s</span>

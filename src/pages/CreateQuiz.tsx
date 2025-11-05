@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Image as ImageIcon, ArrowLeft } from "lucide-react";
+import { useMutation } from "convex/react"; // <-- 1. Add this import
+import { api } from "../../convex/_generated/api"; // <-- 2. Add this import
 
 type Question = {
   question_text: string;
@@ -39,6 +41,9 @@ const CreateQuiz = () => {
       order_number: 0
     }
   ]);
+
+  // <-- 3. Get the mutation function
+  const createQuizMutation = useMutation(api.quizzes.createQuiz);
 
   const addQuestion = () => {
     setQuestions([...questions, {
@@ -79,18 +84,17 @@ const CreateQuiz = () => {
 
     setLoading(true);
     try {
-      // TODO: Replace with your backend API call
-      // const response = await fetch('/api/quizzes', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ title, description, questions })
-      // });
-      // const quiz = await response.json();
+      // <-- 4. Call the mutation correctly
+      const quizId = await createQuizMutation({
+        title,
+        description,
+        questions,
+      });
 
       toast({ title: "Success!", description: "Quiz created successfully" });
-      // navigate(`/quiz/${quiz.id}`);
+      navigate(`/quiz/${quizId}`); // <-- 5. Navigate to the new quiz
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Error", description: `Failed to create quiz: ${error.message}`, variant: "destructive" });
     } finally {
       setLoading(false);
     }

@@ -2,20 +2,29 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 
-// --- Host Actions (Public, but should be called by host) ---
+// Helper function to check if the user is the host
+const checkHost = async (ctx: any, sessionId: any) => {
+  const session = await ctx.db.get(sessionId);
+  if (!session) {
+    throw new Error("Session not found.");
+  }
+  const identity = await ctx.auth.getViewerIdentity();
+  if (session.hostId !== identity?.subject) {
+    throw new Error("Not authorized to perform this action.");
+  }
+  return session;
+};
+
+// --- Host Actions (Secured) ---
 
 // Admin: Starts the quiz
 export const startQuiz = mutation({
   args: { 
     sessionId: v.id("quiz_sessions"),
-    hostId: v.string(),
+    // hostId removed from args
   },
   handler: async (ctx, args) => {
-    // The frontend must pass the hostId to verify
-    const session = await ctx.db.get(args.sessionId);
-    if (session?.hostId !== args.hostId) {
-      throw new Error("Not authorized to start this quiz.");
-    }
+    await checkHost(ctx, args.sessionId); // Security check
     await ctx.db.patch(args.sessionId, { status: "active" });
   },
 });
@@ -24,13 +33,10 @@ export const startQuiz = mutation({
 export const showLeaderboard = mutation({
   args: { 
     sessionId: v.id("quiz_sessions"),
-    hostId: v.string(),
+    // hostId removed from args
   },
   handler: async (ctx, args) => {
-    const session = await ctx.db.get(args.sessionId);
-    if (session?.hostId !== args.hostId) {
-      throw new Error("Not authorized.");
-    }
+    await checkHost(ctx, args.sessionId); // Security check
     await ctx.db.patch(args.sessionId, { show_leaderboard: true });
   },
 });
@@ -39,17 +45,11 @@ export const showLeaderboard = mutation({
 export const nextQuestion = mutation({
   args: { 
     sessionId: v.id("quiz_sessions"),
-    hostId: v.string(),
+    // hostId removed from args
   },
   handler: async (ctx, args) => {
-    const session = await ctx.db.get(args.sessionId);
-    if (session?.hostId !== args.hostId) {
-      throw new Error("Not authorized.");
-    }
-    if (!session) return; // Session not found
-
-    // ** THIS IS THE FIX **
-    // We must use the correct index and sorting
+    const session = await checkHost(ctx, args.sessionId); // Security check
+    
     const questions = await ctx.db
       .query("questions")
       .withIndex("by_quizId_order", (q) => q.eq("quizId", session.quizId))

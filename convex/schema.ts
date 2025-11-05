@@ -1,8 +1,11 @@
 // convex/schema.ts
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server"; 
 
 export default defineSchema({
+  ...authTables, // 
+
   // 'quizzes' table
   quizzes: defineTable({
     creatorId: v.string(), 
@@ -23,8 +26,6 @@ export default defineSchema({
     time_limit: v.number(),
     order_number: v.number(),
   })
-
-    // We create an index on quizId AND order_number for sorting.
     .index("by_quizId_order", ["quizId", "order_number"]),
 
   // 'quiz_sessions' table for live rooms
@@ -47,8 +48,6 @@ export default defineSchema({
     name: v.string(),
     score: v.number(),
   })
-    // ** THIS IS THE FIX for sorting leaderboards **
-    // We create an index on sessionId AND score
     .index("by_sessionId_score", ["sessionId", "score"]), 
 
   // 'answers' table
@@ -61,8 +60,6 @@ export default defineSchema({
     score: v.number(),
     time_taken: v.number(), // Time in seconds
   })
-    // For calculating question results
     .index("by_session_question", ["sessionId", "questionId"])
-    // To prevent a user from answering twice
     .index("by_participant_question", ["participantId", "questionId"]),
 });

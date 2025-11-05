@@ -1,66 +1,64 @@
 import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, Trophy, Loader2 } from "lucide-react";
+import { Clock, Trophy, Loader2, ArrowLeft } from "lucide-react";
+import { useQuery, useMutation } from "convex/react"; // 1. Import Convex hooks
+import { api } from "../../convex/_generated/api"; // 2. Import API
+import { Id } from "../../convex/_generated/dataModel"; // 3. Import Id type
 
 const PlayQuiz = () => {
   const { sessionId } = useParams();
   const [searchParams] = useSearchParams();
   const participantId = searchParams.get('participant');
+  const navigate = useNavigate();
   const { toast } = useToast();
   
-  const [session, setSession] = useState<any>({
-    status: sessionId === 'session-1234' ? "active" : "waiting",
-    show_leaderboard: false
-  });
-  const [currentQuestion, setCurrentQuestion] = useState<any>({
-    question_text: "What is the capital of France?",
-    option_a: "London",
-    option_b: "Paris",
-    option_c: "Berlin",
-    option_d: "Madrid",
-    time_limit: 30
-  });
-  const [participant, setParticipant] = useState<any>({
-    name: participantId || "Player",
-    score: 0
-  });
-  const [participants, setParticipants] = useState<any[]>([
-    { id: 1, name: "Player 1", score: 100 },
-    { id: 2, name: "Player 2", score: 50 }
-  ]);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [hasAnswered, setHasAnswered] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [answerStats, setAnswerStats] = useState<Record<string, number>>({
-    A: 5,
-    B: 12,
-    C: 3,
-    D: 8
-  });
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  // 4. Get all player data from one real-time query
+  const sessionData = useQuery(
+    api.sessions.getPlayerSessionData,
+    sessionId && participantId 
+      ? { 
+          sessionId: sessionId as Id<"quiz_sessions">, 
+          participantId: participantId as Id<"participants"> 
+        } 
+      : "skip"
+  );
+
+  // 5. Get the submitAnswer mutation
+  const submitAnswerMutation = useMutation(api.gameplay.submitAnswer);
+
+  // Extract data from the query
+  const session = sessionData?.session;
+  const participant = sessionData?.participant;
+  const allParticipants = sessionData?.allParticipants;
+  const currentQuestion = sessionData?.currentQuestion;
+  const answerStats = sessionData?.answerStats;
+  const hasAnswered = sessionData?.hasAnswered;
+
+  // Timer logic
+  useEffect(() => {
+    if (session?.status === 'active' && !session.show_leaderboard && currentQuestion) {
+      // Start a new timer when the question changes
+      setTimeLeft(currentQuestion.time_limit);
+      setSelectedAnswer(null); // Clear previous selection
+    }
+  }, [currentQuestion, session?.status, session?.show_leaderboard]);
 
   useEffect(() => {
-    // TODO: Replace with your backend WebSocket/SSE connection
-    // const ws = new WebSocket(`ws://your-backend/sessions/${sessionId}?participant=${participantId}`);
-    // ws.onmessage = (event) => {
-    //   const data = JSON.parse(event.data);
-    //   setSession(data.session);
-    //   setCurrentQuestion(data.currentQuestion);
-    //   setTimeLeft(data.timeLeft);
-    //   setParticipants(data.participants);
-    // };
-  }, [sessionId, participantId]);
-
-  useEffect(() => {
-    if (timeLeft > 0 && session?.status === 'active' && !hasAnswered) {
+    if (timeLeft > 0 && session?.status === 'active' && !session.show_leaderboard && !hasAnswered) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && !hasAnswered) {
-      setHasAnswered(true);
+    } else if (timeLeft === 0 && session?.status === 'active' && !hasAnswered && currentQuestion) {
+      // Time's up! Automatically submit a "null" answer (or just lock)
+      // For this app, we'll just prevent further answers
+      toast({ title: "Time's up!", description: "Waiting for next question."});
     }
-  }, [timeLeft, session?.status, hasAnswered]);
+  }, [timeLeft, session?.status, hasAnswered, currentQuestion]);
 
   const handleOptionSelect = (option: string) => {
     if (hasAnswered || timeLeft === 0) return;
@@ -68,22 +66,17 @@ const PlayQuiz = () => {
   };
 
   const submitAnswer = async () => {
-    if (hasAnswered || !selectedAnswer || !currentQuestion) return;
-
-    setHasAnswered(true);
+    if (hasAnswered || !selectedAnswer || !currentQuestion || !sessionId || !participantId) return;
 
     try {
-      // TODO: Replace with your backend API call
-      // await fetch('/api/answers', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ 
-      //     participantId, 
-      //     questionId: currentQuestion.id, 
-      //     answer: selectedAnswer,
-      //     timeTaken: currentQuestion.time_limit - timeLeft 
-      //   })
-      // });
+      // 6. Call the mutation
+      await submitAnswerMutation({
+        participantId: participantId as Id<"participants">, 
+        questionId: currentQuestion._id, 
+        sessionId: sessionId as Id<"quiz_sessions">,
+        answer: selectedAnswer,
+        time_taken: currentQuestion.time_limit - timeLeft 
+      });
       
       toast({ title: "Answer submitted!" });
     } catch (error: any) {
@@ -91,14 +84,46 @@ const PlayQuiz = () => {
     }
   };
 
+  // Helper functions for leaderboard stats
   const getTotalAnswers = () => {
+    if (!answerStats) return 0;
     return Object.values(answerStats).reduce((sum, count) => sum + count, 0);
   };
 
   const getPercentage = (option: string) => {
+    if (!answerStats) return 0;
     const total = getTotalAnswers();
     return total > 0 ? Math.round((answerStats[option] / total) * 100) : 0;
   };
+
+  // 7. Handle loading state
+  if (sessionData === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin" />
+      </div>
+    );
+  }
+
+  // 8. Handle not found or invalid participant
+  if (sessionData === null) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <h1 className="text-4xl font-bold mb-4">Session Not Found</h1>
+        <p className="text-muted-foreground mb-4">
+          This quiz session may have ended, or the link is invalid.
+        </p>
+        <Button
+          variant="ghost"
+          onClick={() => navigate('/')}
+          className="mb-6"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Home
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-accent/10 pt-4 pb-4">
@@ -152,18 +177,20 @@ const PlayQuiz = () => {
                 if (!optionText) return null;
                 
                 const isSelected = selectedAnswer === option;
-                const percentage = hasAnswered ? getPercentage(option) : 0;
+                // Stats are only shown when the user has answered and leaderboard is on
+                const showStats = hasAnswered && session.show_leaderboard;
+                const percentage = showStats ? getPercentage(option) : 0;
                 
                 return (
                   <div
                     key={option}
                     onClick={() => handleOptionSelect(option)}
-                    className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                      hasAnswered 
+                    className={`relative p-4 rounded-xl border-2 transition-all ${
+                      (hasAnswered || timeLeft === 0)
                         ? 'cursor-default' 
-                        : 'hover:border-primary/50'
+                        : 'cursor-pointer hover:border-primary/50'
                     } ${
-                      isSelected && !hasAnswered
+                      isSelected && !(hasAnswered || timeLeft === 0)
                         ? 'border-primary bg-primary/10' 
                         : 'border-border bg-card/50'
                     } ${
@@ -179,14 +206,14 @@ const PlayQuiz = () => {
                         {option}
                       </div>
                       <span className="text-base font-medium flex-1">{optionText}</span>
-                      {hasAnswered && (
+                      {showStats && (
                         <div className="text-right">
-                          <div className="text-xs text-muted-foreground">{answerStats[option]} votes</div>
+                          <div className="text-xs text-muted-foreground">{answerStats?.[option] || 0} votes</div>
                           <div className="text-base font-bold text-primary">{percentage}%</div>
                         </div>
                       )}
                     </div>
-                    {hasAnswered && (
+                    {showStats && (
                       <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-primary transition-all duration-500"
@@ -212,7 +239,8 @@ const PlayQuiz = () => {
               </div>
             ) : (
               <p className="text-center text-base font-semibold text-primary">
-                Answer submitted! Wait for the next question...
+                <Loader2 className="inline-block mr-2 h-4 w-4 animate-spin" />
+                Answer submitted! Waiting for the host...
               </p>
             )}
           </Card>
@@ -224,11 +252,11 @@ const PlayQuiz = () => {
             <h2 className="text-3xl font-bold mb-8">Current Standings</h2>
             
             <div className="space-y-3">
-              {participants.map((p, i) => (
+              {allParticipants?.map((p, i) => (
                 <div 
-                  key={p.id}
+                  key={p._id}
                   className={`flex justify-between items-center p-4 rounded-lg ${
-                    p.id === participantId ? 'bg-primary/20 border-2 border-primary' :
+                    p._id === participantId ? 'bg-primary/20 border-2 border-primary' :
                     i === 0 ? 'bg-warning/20 border-2 border-warning' :
                     'bg-muted'
                   }`}
@@ -241,6 +269,7 @@ const PlayQuiz = () => {
                 </div>
               ))}
             </div>
+            <p className="text-center text-muted-foreground mt-8">Waiting for host to start the next question...</p>
           </Card>
         )}
 
@@ -252,11 +281,11 @@ const PlayQuiz = () => {
             
             <h3 className="text-2xl font-bold mb-4">Final Rankings</h3>
             <div className="space-y-3">
-              {participants.map((p, i) => (
+              {allParticipants?.map((p, i) => (
                 <div 
-                  key={p.id}
+                  key={p._id}
                   className={`flex justify-between items-center p-4 rounded-lg ${
-                    p.id === participantId ? 'bg-primary/20 border-2 border-primary' :
+                    p._id === participantId ? 'bg-primary/20 border-2 border-primary' :
                     i === 0 ? 'bg-warning/20 border-2 border-warning' :
                     'bg-muted'
                   }`}
@@ -269,6 +298,9 @@ const PlayQuiz = () => {
                 </div>
               ))}
             </div>
+            <Button onClick={() => navigate('/')} size="lg" className="mt-8">
+              Back to Home
+            </Button>
           </Card>
         )}
       </div>
