@@ -64,8 +64,22 @@ export const nextQuestion = mutation({
       await ctx.db.patch(args.sessionId, {
         current_question_index: nextIndex,
         show_leaderboard: false,
+        // Reset any revealed-answer flag when moving to the next question
+        reveal_answer: false,
       });
     }
+  },
+});
+
+// Admin: Reveal or hide the correct answer independently
+export const setRevealAnswer = mutation({
+  args: {
+    sessionId: v.id("quiz_sessions"),
+    reveal: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    await checkHost(ctx, args.sessionId);
+    await ctx.db.patch(args.sessionId, { reveal_answer: args.reveal });
   },
 });
 

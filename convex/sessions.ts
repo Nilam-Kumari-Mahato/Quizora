@@ -168,20 +168,23 @@ export const getPlayerSessionData = query({
       .order("desc")
       .collect();
 
-    let answerStats: Record<string, number> = {};
-    let hasAnswered = false;
+      let answerStats: Record<string, number> = {};
+      let hasAnswered = false;
 
-    if (currentQuestion) {
-      const answerDoc = await ctx.db
-        .query("answers")
-        .withIndex("by_participant_question", (q) =>
-          q.eq("participantId", args.participantId).eq("questionId", currentQuestion._id)
-        )
-        .first();
+      // Map of participantId -> score awarded for the current question (if any)
+      const currentQuestionScores: Record<string, number> = {};
 
-      hasAnswered = !!answerDoc;
+      if (currentQuestion) {
+        const answerDoc = await ctx.db
+          .query("answers")
+          .withIndex("by_participant_question", (q) =>
+            q.eq("participantId", args.participantId).eq("questionId", currentQuestion._id)
+          )
+          .first();
 
-      if (session.show_leaderboard) {
+        hasAnswered = !!answerDoc;
+
+        // Always fetch answers for the current question so we can mask scores for players
         const answers = await ctx.db
           .query("answers")
           .withIndex("by_session_question", (q) =>
@@ -189,21 +192,43 @@ export const getPlayerSessionData = query({
           )
           .collect();
 
-        answerStats = answers.reduce((acc, ans) => {
-          acc[ans.answer] = (acc[ans.answer] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
+        // Build per-option stats (used when leaderboard is shown)
+        if (session.show_leaderboard) {
+          answerStats = answers.reduce((acc, ans) => {
+            acc[ans.answer] = (acc[ans.answer] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
 
-        for (const opt of ["A", "B", "C", "D"]) {
-          if (answerStats[opt] === undefined) answerStats[opt] = 0;
+          for (const opt of ["A", "B", "C", "D"]) {
+            if (answerStats[opt] === undefined) answerStats[opt] = 0;
+          }
+        }
+
+        // Record per-participant score for the current question so we can subtract it from
+        // their displayed score until the host reveals the answer.
+        for (const a of answers) {
+          const pid = a.participantId as string;
+          currentQuestionScores[pid] = (currentQuestionScores[pid] || 0) + (a.score || 0);
         }
       }
-    }
+
+    // For players, hide the score gained from the current question until reveal
+    const visibleParticipants = allParticipants.map((p) => {
+      const extra = currentQuestion ? (currentQuestionScores[p._id] || 0) : 0;
+      const visibleScore = session.reveal_answer ? p.score : p.score - extra;
+      return { ...p, score: visibleScore };
+    });
+
+    const visibleParticipant = (() => {
+      const extra = currentQuestion ? (currentQuestionScores[participant._id] || 0) : 0;
+      const visibleScore = session.reveal_answer ? participant.score : participant.score - extra;
+      return { ...participant, score: visibleScore };
+    })();
 
     return {
       session,
-      participant,
-      allParticipants,
+      participant: visibleParticipant,
+      allParticipants: visibleParticipants,
       currentQuestion,
       answerStats,
       hasAnswered,

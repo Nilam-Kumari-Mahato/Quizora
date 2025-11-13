@@ -180,6 +180,8 @@ const PlayQuiz = () => {
                 // Stats are only shown when the user has answered and leaderboard is on
                 const showStats = hasAnswered && session.show_leaderboard;
                 const percentage = showStats ? getPercentage(option) : 0;
+                // Determine if this option is the correct one to highlight when host reveals
+                const isCorrect = !!currentQuestion?.correct_answer && session?.reveal_answer && currentQuestion.correct_answer === option;
                 
                 return (
                   <div
@@ -197,7 +199,8 @@ const PlayQuiz = () => {
                       hasAnswered && isSelected
                         ? 'border-primary bg-primary/20'
                         : ''
-                    } `}
+                    } 
+                    ${isCorrect ? 'ring-4 ring-success/50 bg-success/10 border-success scale-105' : ''}`}
                   >
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center text-base font-bold ${

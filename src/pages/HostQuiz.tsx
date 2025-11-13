@@ -16,7 +16,7 @@ const HostQuiz = () => {
   const { toast } = useToast();
   const [timeLeft, setTimeLeft] = useState(0);
   const [timerStarted, setTimerStarted] = useState(false);
-  const [revealAnswerState, setRevealAnswerState] = useState(false);
+  // reveal state is managed on the server (session.reveal_answer); UI will read from session
   // const [showLeaderboardState, setShowLeaderboardState] = useState(false); // <-- REMOVED
 
   // 4. Get all data from one real-time query
@@ -27,8 +27,6 @@ const HostQuiz = () => {
 
   // 5. Get mutation functions
   const startQuizMutation = useMutation(api.gameplay.startQuiz);
-  const showLeaderboardMutation = useMutation(api.gameplay.showLeaderboard);
-  const nextQuestionMutation = useMutation(api.gameplay.nextQuestion);
 
   // Extract data from the query result
   const session = sessionData?.session;
@@ -70,10 +68,10 @@ const HostQuiz = () => {
     }
   }, [timeLeft, session?.status, currentQuestion, session?.show_leaderboard, timerStarted, toast]); // Added toast
 
-  // Reset reveal state whenever the current question changes
-  useEffect(() => {
-    setRevealAnswerState(false);
-  }, [currentQuestion?._id]);
+  // reveal state is controlled by the session (server). No local reset needed here.
+  const showLeaderboardMutation = useMutation(api.gameplay.showLeaderboard);
+  const setRevealAnswerMutation = useMutation(api.gameplay.setRevealAnswer);
+  const nextQuestionMutation = useMutation(api.gameplay.nextQuestion);
 
 
   // 6. Hook up mutations
@@ -212,12 +210,19 @@ const HostQuiz = () => {
               {/* --- MODIFIED BUTTON GROUP --- */}
               <div className="flex gap-1 justify-end mb-2 ">
                 <Button
-                  onClick={() => setRevealAnswerState((r) => !r)}
+                  onClick={async () => {
+                    if (!sessionId) return;
+                    try {
+                      await setRevealAnswerMutation({ sessionId: sessionId as Id<"quiz_sessions">, reveal: !session?.reveal_answer });
+                    } catch (error: any) {
+                      toast({ title: "Error", description: error.message, variant: "destructive" });
+                    }
+                  }}
                   size="sm"
-                  variant={revealAnswerState ? undefined : "outline"}
+                  variant={session?.reveal_answer ? undefined : "outline"}
                   className="px-3 py-2 text-sm sm:px-4 sm:py-2 sm:text-base md:px-5 md:py-3 md:text-lg rounded-lg text-gray-600"
                 >
-                Reveal Answer
+                  Reveal Answer
                 </Button>
                 <Button
                   onClick={handleShowLeaderboardClick} // <-- Use new handler
@@ -239,14 +244,14 @@ const HostQuiz = () => {
                     default: 'gray-600 border-gray-300 '
                   } as Record<string, string>;
 
-                  const isCorrect = revealAnswerState && currentQuestion?.correct_answer === option;
+                  const isCorrect = session?.reveal_answer && currentQuestion?.correct_answer === option;
 
                   return (
                     <div
                       key={option}
                       className={`p-4 rounded-xl bg-gradient-to-br ${colors.default} text-primary-glow flex items-center justify-start gap-4 transition-all duration-200 ${isCorrect ? 'ring-4 ring-success/50 bg-success/10 border-success scale-105' : ''}`}
                     >
-                      <span className="w-16 rounded-full p-2 bg-accent text-xl font-bold text-center">{option}</span>
+                      <span className="w-10 h-10 rounded-full p-2 bg-muted text-muted-foreground text-xl font-bold text-center">{option}</span>
                       <span className="text-xl">{optionText}</span>
                     </div>
                   );
