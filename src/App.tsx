@@ -1,3 +1,4 @@
+// src/App.tsx
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { ThemeToggle } from "@/components/ThemeToggle";
-// import { AuthButtons } from "@/components/AuthButtons";  <-- REMOVED
+import { AuthButtons } from "@/components/AuthButtons";  // <-- 1. UNCOMMENT THIS
 import Index from "./pages/Index";
 import CreateQuiz from "./pages/CreateQuiz";
 import JoinQuiz from "./pages/JoinQuiz";
@@ -23,7 +24,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <ThemeToggle />
-        {/* <AuthButtons /> <-- REMOVED */}
+        <AuthButtons /> {/* <-- 2. ADD THIS BACK */}
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
