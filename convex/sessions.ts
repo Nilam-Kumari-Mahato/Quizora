@@ -1,6 +1,5 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { Doc } from "./_generated/dataModel"; // <-- Import Doc
 
 // Helper function to generate a 6-character join code
@@ -18,12 +17,11 @@ export const createSession = mutation({
   args: { quizId: v.id("quizzes") },
   handler: async (ctx, args) => {
     // Get the currently authenticated user's ID (or anonymous ID)
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("You must be logged in to host a quiz.");
+    const identity = await ctx.auth.getUserIdentity();
+if (!identity) {
+  throw new Error("You must be logged in to host a quiz.");
 }
-const hostId = userId;
-
+const hostId = identity.subject;
     // Fetch the quiz
     const quiz = await ctx.db.get(args.quizId);
     if (!quiz) {
@@ -98,13 +96,12 @@ export const getHostSessionData = query({
     const session = await ctx.db.get(args.sessionId);
     if (!session) return null;
 
-   const userId = await getAuthUserId(ctx);
+   const identity = await ctx.auth.getUserIdentity();
 
 // Security: Only the host can view.
-    if (session.hostId !== userId) {
-    return null; 
+if (session.hostId !== identity?.subject) {
+   return null; 
 }
-
     const quiz = await ctx.db.get(session.quizId);
     if (!quiz) return null;
 

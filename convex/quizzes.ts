@@ -1,7 +1,6 @@
 // convex/quizzes.ts
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";  // <-- correct import
 
 // Admin: Create a new quiz and its questions
 export const createQuiz = mutation({
@@ -23,12 +22,11 @@ export const createQuiz = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    
-    if (!userId) {
-      throw new Error("You must be logged in to create a quiz.");
-    }
-    const creatorId = userId;
+   const identity = await ctx.auth.getUserIdentity();
+if (!identity) {
+  throw new Error("You must be logged in to create a quiz.");
+}
+const creatorId = identity.subject; // This is the Clerk User ID
 
     const quizId = await ctx.db.insert("quizzes", {
       title: args.title,

@@ -1,8 +1,7 @@
 // convex/gameplay.ts
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
-// import { getAuthUserId } from "@convex-dev/auth/server"; // <-- REMOVED
+
 
 // Helper function to check if the user is the host (AUTH REMOVED)
 // Helper function to check if the user is the host
@@ -12,11 +11,10 @@ const checkHost = async (ctx: any, sessionId: any) => {
     throw new Error("Session not found.");
   }
 
-  const userId = await getAuthUserId(ctx);
-  if (session.hostId !== userId) {
-    throw new Error("You are not authorized to perform this action.");
-  }
-
+  const identity = await ctx.auth.getUserIdentity();
+if (session.hostId !== identity?.subject) {
+  throw new Error("You are not authorized to perform this action.");
+}
   return session;
 };
 
