@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Users, Play, SkipForward, Trophy, Clock, Loader2, ArrowLeft } from "lucide-react";
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api"; 
 import { Id } from "../../convex/_generated/dataModel"; 
@@ -269,7 +270,8 @@ const HostQuiz = () => {
 
           {session?.status === 'active' && session?.show_leaderboard && (
             <div className="text-center py-12">
-              <Trophy className="h-10 w-10 sm:h-12 sm:w-12 md:h-16 md:w-16 lg:h-20 lg:w-20 mx-auto mb-4 text-warning" />
+              <DotLottieReact src="path/to/animation.lottie" loop autoplay
+              className="h-10 w-10 sm:h-12 sm:w-12 md:h-16 md:w-16 lg:h-20 lg:w-20 mx-auto mb-4 text-warning" />
               <h2 className="text-3xl font-bold mb-8">Leaderboard</h2>
               
               <div className="space-y-3 mb-8">

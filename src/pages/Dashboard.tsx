@@ -33,16 +33,21 @@ export default function Dashboard() {
         </header>
         
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          
           <div className="flex flex-row w-full justify-end">
-            <Button onClick={() => navigate('/create-quiz')} className="bg-primary text-primary-foreground hover:bg-primary/80 rounded-full border border-primary-foreground-30 mr-10 mt-5 p-5">
+            <Button variant="outline" onClick={() => navigate('/join')} className="text-primary hover:bg-primary/90 rounded-md border border-primary-foreground-30 mr-32 mt-5 p-5 px-7">
+                        Join Quiz
+                      </Button>
+          </div>
+    
+
+            <div className="bg-muted/30 min-h-[100vh] flex-1 rounded-md md:min-h-min ">
+            <div className="flex flex-row w-full justify-end">
+            <Button onClick={() => navigate('/create-quiz')} className="bg-primary text-primary-foreground hover:bg-background/80 hover:text-primary rounded-full border border-primary-foreground-30 mr-32 mt-5 p-5">
                         <Plus className="h-4 w-4 mr-2" />
                         Create Quiz
                       </Button>
           </div>
-
-            <div className="bg-muted/30 min-h-[100vh] flex-1 rounded-md md:min-h-min ">
-            <div className="px-32 py-10 h-screen">
+            <div className="px-32 py-3 h-screen">
             <div className="flex flex-row justify-between m-5 text-muted-foreground/70">
               <p>Quiz details</p>
               <p>Created</p>
