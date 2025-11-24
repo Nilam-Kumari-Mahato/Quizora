@@ -16,6 +16,7 @@ import QuizDetails from "./pages/QuizDetails";
 import HostQuiz from "./pages/HostQuiz";
 import PlayQuiz from "./pages/PlayQuiz";
 import NotFound from "./pages/NotFound";
+import { StateDemo } from "./components/StateDemo";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => (
             <Route path="/quiz/:id" element={<QuizDetails />} />
             <Route path="/host/:sessionId" element={<HostQuiz />} />
             <Route path="/play/:sessionId" element={<PlayQuiz />} />
+            <Route path="/demo" element={<StateDemo />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
