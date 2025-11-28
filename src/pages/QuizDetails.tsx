@@ -122,8 +122,8 @@ const QuizDetails = () => {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-t from-zinc-200/80 via-zinc-200/80 to-zinc-200/80 dark:bg-gradient-to-b dark:from-black/80 dark:via-black/80 dark:to-black/80 py-8 font-sans">
-      <div className="container max-w-4xl mx-auto px-4">
+    <div className="min-h-screen bg-gradient-to-t from-zinc-200/80 via-zinc-200/80 to-zinc-200/80 dark:bg-gradient-to-b dark:from-black/80 dark:via-black/80 dark:to-black/80 py-8 ">
+      <div className="container max-w-4xl mx-auto px-2">
         <Button
           variant="ghost"
           onClick={() => navigate('/dashboard')}

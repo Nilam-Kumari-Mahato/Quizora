@@ -159,7 +159,7 @@ const PlayQuiz = () => {
   const lastTimeText = (sessionData as any)?.lastTimeTaken ? `${(sessionData as any).lastTimeTaken.toFixed(1)}s` : "-";
 
   return (
-    <div className="min-h-screen bg-gradient-to-t from-zinc-200/80 via-zinc-200/80 to-zinc-200/80 dark:bg-gradient-to-b dark:from-black/80 dark:via-black/80 dark:to-black/80 pt-4 pb-4 font-sans">
+    <div className="min-h-screen bg-gradient-to-t from-zinc-200/80 via-zinc-200/80 to-zinc-200/80 dark:bg-gradient-to-b dark:from-black/80 dark:via-black/80 dark:to-black/80 pt-4 pb-4 ">
       <div className="container max-w-md sm:max-w-2xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mt-12">
         <Card className="p-1 mb-6">
           <div className="flex justify-between items-center">

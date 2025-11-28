@@ -151,7 +151,7 @@ const HostQuiz = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-t from-zinc-200/80 via-zinc-200/80 to-zinc-200/80 dark:bg-gradient-to-b dark:from-black/80 dark:via-black/80 dark:to-black/80 p-2 font-sans">
+    <div className="min-h-screen bg-gradient-to-t from-zinc-200/80 via-zinc-200/80 to-zinc-200/80 dark:bg-gradient-to-b dark:from-black/80 dark:via-black/80 dark:to-black/80 p-2 ">
       <div className="container max-w-6xl mx-auto mt-20">
         <Card className="p-2 mb-6">
           <div className="flex justify-between items-center">

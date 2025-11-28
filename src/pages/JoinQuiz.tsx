@@ -71,7 +71,7 @@ const JoinQuiz = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-t from-zinc-200/80 via-zinc-200/80 to-zinc-200/80 dark:bg-gradient-to-b dark:from-black/80 dark:via-black/80 dark:to-black/80 flex items-center justify-center p-4 animate-fade-in-up font-sans">
+    <div className="min-h-screen bg-gradient-to-t from-zinc-200/80 via-zinc-200/80 to-zinc-200/80 dark:bg-gradient-to-b dark:from-black/80 dark:via-black/80 dark:to-black/80 flex items-center justify-center p-4 animate-fade-in-up ">
       <Card className="w-full max-w-md p-8 bg-card border-border border-x-primary-foreground-30 rounded-3xl shadow-2xl">
         <Button
           variant="ghost"
