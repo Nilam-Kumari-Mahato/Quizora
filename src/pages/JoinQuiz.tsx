@@ -98,7 +98,7 @@ const JoinQuiz = () => {
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="Enter code"
               maxLength={6}
-              className="mt-2 text-center text-xl lg:text-2xl font-bold tracking-widest rounded-xl bg-input border-border placeholder:text-sm md:placeholder:text-sm"
+              className="mt-2 text-xl lg:text-2xl font-bold rounded-xl bg-input border-border placeholder:text-sm md:placeholder:text-lg"
             />
           </div>
 
@@ -110,7 +110,7 @@ const JoinQuiz = () => {
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter your name"
               readOnly={isSignedIn}
-              className="mt-2 bg-input border-border rounded-xl font-bold text-foreground read-only:bg-muted read-only:text-muted-foreground read-only:cursor-default"
+              className="mt-2 bg-input border-border rounded-xl text-foreground read-only:bg-muted read-only:text-muted-foreground read-only:cursor-default placeholder:text-sm md:placeholder:text-lg"
             />
           </div>
 
