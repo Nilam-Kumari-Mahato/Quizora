@@ -4,15 +4,19 @@ import { Button } from "./ui/button";
 
 export function AuthButtons() {
   return (
-    <div className="fixed top-5 right-24 z-50">
+    <>
       <SignedOut>
-        <SignInButton mode="modal">
-          <Button>Sign In</Button>
-        </SignInButton>
+        <div className="fixed top-4 right-24 z-50">
+          <SignInButton mode="modal">
+            <Button>Sign In</Button>
+          </SignInButton>
+        </div>
       </SignedOut>
       <SignedIn>
-        <UserButton afterSignOutUrl="/" />
+        <div className="fixed top-5 right-24 z-50">
+          <UserButton afterSignOutUrl="/" />
+        </div>
       </SignedIn>
-    </div>
+    </>
   );
 }

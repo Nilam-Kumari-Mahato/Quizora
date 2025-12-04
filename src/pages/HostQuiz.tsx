@@ -293,16 +293,7 @@ const HostQuiz = () => {
                 ))}
               </div>
 
-              <div className="flex gap-2 justify-between">
-                <Button
-                  onClick={skipLeaderboard}
-                  size="lg"
-                  variant="outline"
-                  className="p-3 sm:p-3 md:p-4 rounded-full dark:text-zinc-300 hover:dark:text-black"
-                >
-                  <SkipForward className="h-5 w-5" />
-                  Skip
-                </Button>
+              <div className="flex justify-end">
                 <Button
                   onClick={nextQuestion}
                   size="lg"

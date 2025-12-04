@@ -42,9 +42,11 @@ const PlayQuiz = () => {
   const submittedAnswer = (sessionData as any)?.submittedAnswer ?? null;
 
   const [timeLeft, setTimeLeft] = useState(30);
+  const [timeUpNotified, setTimeUpNotified] = useState(false);
 
   useEffect(() => {
     setSelectedAnswer(null);
+    setTimeUpNotified(false);
   }, [currentQuestion?._id]);
   useEffect(() => {
 
@@ -66,8 +68,9 @@ const PlayQuiz = () => {
 
         setTimeLeft(remainingSeconds);
 
-        if (remainingSeconds === 0 && !hasAnswered) {
+        if (remainingSeconds === 0 && !hasAnswered && !timeUpNotified) {
           toast({ title: "Time's up!", description: "Waiting for next question." });
+          setTimeUpNotified(true);
         }
       };
 
@@ -87,6 +90,8 @@ const PlayQuiz = () => {
     session?.currentQuestionEndTime,
     hasAnswered,
     currentQuestion?.time_limit,
+    timeUpNotified,
+    toast,
   ]);
 
 

@@ -72,7 +72,16 @@ export const nextQuestion = mutation({
 
     const nextIndex = session.current_question_index + 1;
 
-    if (nextIndex >= questions.length) {
+    // If we're currently on the last question, go directly to finished state
+    if (session.current_question_index === questions.length - 1) {
+      await ctx.db.patch(args.sessionId, {
+        status: "finished",
+        show_leaderboard: false,
+        currentQuestionStartTime: undefined,
+        currentQuestionEndTime: undefined,
+      });
+    } else if (nextIndex >= questions.length) {
+      // This shouldn't happen, but keep as fallback
       await ctx.db.patch(args.sessionId, {
         status: "finished",
         currentQuestionStartTime: undefined,
