@@ -39,20 +39,18 @@ The goal is to make learning more engaging by combining **speed, accuracy, and c
 ## 📁 Project Structure (Overview)
 
 src/
-├── components/
-│ ├── Quiz.tsx # Core quiz logic
-│ ├── Question.tsx # Displays questions & options
-│ ├── Timer.tsx # Countdown timer
-│ ├── Result.tsx # Final score screen
-│
-├── data/
-│ └── questions.ts # Quiz questions data
-│
-├── App.tsx # Controls app flow
-└── main.tsx # Application entry point
+ ├── components/
+ │    ├── Quiz.tsx
+ │    ├── Question.tsx
+ │    ├── Timer.tsx
+ │    ├── Result.tsx
+ │
+ ├── data/
+ │    └── questions.ts
+ │
+ ├── App.tsx
+ └── main.tsx
 
-yaml
-Copy code
 
 ---
 
