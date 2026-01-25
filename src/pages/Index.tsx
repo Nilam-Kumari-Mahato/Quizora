@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, Users, Zap } from "lucide-react";
-import { SignedIn } from "@clerk/clerk-react";
+
 
 const Index = () => {
   const navigate = useNavigate();

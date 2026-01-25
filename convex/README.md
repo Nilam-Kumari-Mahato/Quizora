@@ -1,61 +1,90 @@
-# Convex Backend
+# Welcome to your Convex functions directory!
 
-## Overview
-This directory contains the Convex backend for the Quizora quiz application.
+Write your Convex functions here.
+See https://docs.convex.dev/functions for more.
 
-## Structure
+A query function that takes two arguments looks like:
 
-### Core Files
-- `schema.ts` - Database schema definitions
-- `auth.config.js` - Clerk authentication configuration
-- `router.ts` - HTTP router configuration
-- `crons.ts` - Scheduled jobs (cleanup old quizzes)
+```ts
+// convex/myFunctions.ts
+import { query } from "./_generated/server";
+import { v } from "convex/values";
 
-### Feature Modules
-- `users.ts` - User management and sync with Clerk
-- `quizzes.ts` - Quiz CRUD operations
-- `sessions.ts` - Quiz session management (create, join, query)
-- `gameplay.ts` - Real-time gameplay logic (start, answer, leaderboard)
+export const myQueryFunction = query({
+  // Validators for arguments.
+  args: {
+    first: v.number(),
+    second: v.string(),
+  },
 
-## Database Schema
+  // Function implementation.
+  handler: async (ctx, args) => {
+    // Read the database as many times as you need here.
+    // See https://docs.convex.dev/database/reading-data.
+    const documents = await ctx.db.query("tablename").collect();
 
-### Tables
-1. **users** - Stores Clerk user information
-2. **quizzes** - Quiz definitions
-3. **questions** - Quiz questions
-4. **quiz_sessions** - Live quiz sessions
-5. **participants** - Players in sessions
-6. **answers** - Player answers and scores
+    // Arguments passed from the client are properties of the args object.
+    console.log(args.first, args.second);
 
-## Authentication
-
-Authentication is handled by Clerk. The `auth.config.js` file configures Convex to accept Clerk JWT tokens.
-
-### Getting User Identity
-```typescript
-const identity = await ctx.auth.getUserIdentity();
-const userId = identity?.subject; // Clerk user ID
+    // Write arbitrary JavaScript here: filter, aggregate, build derived data,
+    // remove non-public properties, or create new objects.
+    return documents;
+  },
+});
 ```
 
-## Performance Optimizations
+Using this query function in a React component looks like:
 
-All queries use `Promise.all()` for parallel execution where possible:
-- Session data fetching
-- Answer submission
-- User sync operations
-
-## Cron Jobs
-
-- **Daily at midnight UTC**: Deletes quizzes older than 90 days
-
-## Development
-
-Start the Convex dev server:
-```bash
-npx convex dev
+```ts
+const data = useQuery(api.myFunctions.myQueryFunction, {
+  first: 10,
+  second: "hello",
+});
 ```
 
-Deploy to production:
-```bash
-npx convex deploy
+A mutation function looks like:
+
+```ts
+// convex/myFunctions.ts
+import { mutation } from "./_generated/server";
+import { v } from "convex/values";
+
+export const myMutationFunction = mutation({
+  // Validators for arguments.
+  args: {
+    first: v.string(),
+    second: v.string(),
+  },
+
+  // Function implementation.
+  handler: async (ctx, args) => {
+    // Insert or modify documents in the database here.
+    // Mutations can also read from the database like queries.
+    // See https://docs.convex.dev/database/writing-data.
+    const message = { body: args.first, author: args.second };
+    const id = await ctx.db.insert("messages", message);
+
+    // Optionally, return a value from your mutation.
+    return await ctx.db.get("messages", id);
+  },
+});
 ```
+
+Using this mutation function in a React component looks like:
+
+```ts
+const mutation = useMutation(api.myFunctions.myMutationFunction);
+function handleButtonPress() {
+  // fire and forget, the most common way to use mutations
+  mutation({ first: "Hello!", second: "me" });
+  // OR
+  // use the result once the mutation has completed
+  mutation({ first: "Hello!", second: "me" }).then((result) =>
+    console.log(result),
+  );
+}
+```
+
+Use the Convex CLI to push your functions to a deployment. See everything
+the Convex CLI can do by running `npx convex -h` in your project root
+directory. To learn more, launch the docs with `npx convex docs`.
