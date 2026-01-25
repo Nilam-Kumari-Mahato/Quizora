@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useAuth, useUser } from "@clerk/clerk-react";
+
 
 const JoinQuiz = () => {
   const navigate = useNavigate();
@@ -17,16 +17,14 @@ const JoinQuiz = () => {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
 
-  const { isSignedIn } = useAuth();
-  const { user } = useUser();
+
+  
 
 
-  useEffect(() => {
+useEffect(() => {
 
-    if (isSignedIn && user?.fullName) {
-      setName(user.fullName);
-    }
-  }, [isSignedIn, user?.fullName]); // Dependency array
+    
+  })
 
   // 3. Get the joinSession mutation
   const joinSessionMutation = useMutation(api.sessions.joinSession);

@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Play, Copy, CheckCircle, Loader2 } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
-import { useAuth } from "@clerk/clerk-react";
+
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 
@@ -15,7 +15,7 @@ const QuizDetails = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { isLoaded, isSignedIn } = useAuth();
+ 
 
   // Fetch quiz data, casting the 'id' string to Id<"quizzes">
   const quizData = useQuery(

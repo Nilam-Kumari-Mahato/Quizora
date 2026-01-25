@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.30.0",
-    "@clerk/clerk-react": "^5.55.0",
     "@emotion/react": "^11.14.0",
     "@hookform/resolvers": "^3.10.0",
     "@lottiefiles/dotlottie-react": "^0.17.8",

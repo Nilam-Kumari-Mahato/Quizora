@@ -10,7 +10,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { Progress } from "@chakra-ui/react";
-import { useAuth } from "@clerk/clerk-react";
+
 
 const PlayQuiz = () => {
   const { sessionId } = useParams();
@@ -18,7 +18,7 @@ const PlayQuiz = () => {
   const participantId = searchParams.get('participant');
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isSignedIn } = useAuth();
+  
 
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
 
