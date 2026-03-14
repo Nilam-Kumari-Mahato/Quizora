@@ -31,20 +31,17 @@ export default function AttemptDetails() {
     return <div className="p-6">Invalid attempt link.</div>;
   }
 
-<<<<<<< HEAD
   if (!data || !data.questions) {
     return <div className="p-6">Loading attempt...</div>;
   }
 
   console.log("Params:", sessionId, participantId);
-=======
   if (data === undefined) return <div>Loading attempt...</div>;
   if (data === null) return <div>Attempt not found.</div>;
 
   console.log("Params:", sessionId, participantId);
   console.log("sessionId:", sessionId);
   console.log("participantId:", participantId);
->>>>>>> 46df629 (Fix score calculation bug and stabilize quiz flow with attempts + mistake mini session)
 
   const handleRetryMistakes = async () => {
     const result = await createMistakeMiniSession({
@@ -72,12 +69,8 @@ export default function AttemptDetails() {
   
   const questions = (data as any).questions || [];
   const participantAnswers = (data as any).participantAnswers || [];
-<<<<<<< HEAD
-=======
 
   console.log("og score: ",originalScore)
-  
->>>>>>> 46df629 (Fix score calculation bug and stabilize quiz flow with attempts + mistake mini session)
   return (
       // <div className="p-6 space-y-4">
       //   <h1 className="text-2xl font-bold">{data.quiz.title}</h1>
