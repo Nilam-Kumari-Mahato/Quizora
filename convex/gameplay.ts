@@ -100,7 +100,6 @@ export const nextQuestion = mutation({
         currentQuestionEndTime: undefined,
       });
     } else if (nextIndex >= questions.length) {
-      // This shouldn't happen, but keep as fallback
       await ctx.db.patch(args.sessionId, {
         status: "finished",
         currentQuestionStartTime: undefined,

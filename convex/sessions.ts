@@ -371,8 +371,15 @@ export const getPlayerSessionData = query({
 
     // For players, hide the score gained from the current question until reveal
     const visibleParticipants = allParticipants.map((p) => {
-      const extra = currentQuestion ? (currentQuestionScores[p._id] || 0) : 0;
-      const visibleScore = session.reveal_answer ? p.score : Math.max(0, (p.score ?? 0) - extra);
+    const extra = currentQuestion ? (currentQuestionScores[p._id] || 0) : 0;
+
+      const visibleScore =
+        session.status === "finished"
+          ? p.score
+          : session.reveal_answer
+          ? p.score
+          : Math.max(0, (p.score ?? 0) - extra);
+
       return { ...p, score: visibleScore, total_time: participantTotalTimes[p._id] || 0 };
     });
 
@@ -384,7 +391,14 @@ export const getPlayerSessionData = query({
 
     const visibleParticipant = (() => {
       const extra = currentQuestion ? (currentQuestionScores[participant._id] || 0) : 0;
-      const visibleScore = session.reveal_answer ? participant.score : Math.max(0, (participant.score ?? 0) - extra);
+
+      const visibleScore =
+        session.status === "finished"
+          ? participant.score
+          : session.reveal_answer
+          ? participant.score
+          : Math.max(0, (participant.score ?? 0) - extra);
+
       return { ...participant, score: visibleScore };
     })();
 

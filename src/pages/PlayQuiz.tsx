@@ -298,7 +298,8 @@ const displayScore = isMiniMode
   sessionData?.participantAnswers?.filter((a: any) => !a.is_correct) || [];
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-200/30 via-zinc-200/80 to-zinc-200/80 dark:bg-gradient-to-b dark:from-black/80 dark:via-black/80 dark:to-black/80 pt-4 pb-4 ">
-      <div className="container max-w-md sm:max-w-2xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mt-12">
+      {/* <div className="container max-w-md sm:max-w-2xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mt-12"> */}
+      <div className="container w-full max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mt-12 px-4">
         <Card className="px-3 sm:px-4 md:px-5 lg:px-6 py-1.5 sm:py-2 md:py-2.5 lg:py-3 mb-6">
           <div className="flex justify-between items-center gap-3 sm:gap-4">
             <div className="flex-1 min-w-0">
@@ -630,7 +631,8 @@ const displayScore = isMiniMode
               Your Score: {miniSessionScore} / {totalQuestions}
             </p>
 
-            <div className="space-y-4">
+            {/* <div className="space-y-4"> */}
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
               {sessionData?.questions?.map((q, index) => {
                 const answer = sessionData?.participantAnswers?.find(
                   (a: any) => a.questionId === q._id
@@ -647,7 +649,7 @@ const displayScore = isMiniMode
                     key={q._id}
                     className="p-4 rounded-lg border bg-muted"
                   >
-                    <p className="font-semibold mb-2">
+                    <p className="font-semibold mb-2 break-words">
                       Q{index + 1}. {q.question_text}
                     </p>
 
@@ -665,7 +667,8 @@ const displayScore = isMiniMode
               })}
             </div>
 
-            <div className="flex justify-center gap-4 mt-6">
+            {/* <div className="flex justify-center gap-4 mt-6"> */}
+            <div className="flex flex-col sm:flex-row justify-center gap-3 mt-6">
               {session?.status === "finished" && isMiniMode && (
                 <Button
                   onClick={async () => {
