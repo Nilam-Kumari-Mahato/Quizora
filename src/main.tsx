@@ -14,6 +14,9 @@ if (!publishableKey) {
   throw new Error("Missing Clerk Publishable Key in .env");
 }
 
+console.log("VITE_CONVEX_URL:", import.meta.env.VITE_CONVEX_URL);
+console.log("Publishable Key length:", publishableKey?.length);
+
 createRoot(document.getElementById("root")!).render(
   <ClerkProvider publishableKey={publishableKey}>
     <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
@@ -23,3 +26,4 @@ createRoot(document.getElementById("root")!).render(
     </ConvexProviderWithClerk>
   </ClerkProvider>
 );
+console.log("Initial render triggered");
