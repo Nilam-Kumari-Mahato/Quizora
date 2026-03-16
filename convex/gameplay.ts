@@ -25,22 +25,28 @@ export const startQuiz = mutation({
   handler: async (ctx, args) => {
     const session = await checkHost(ctx, args.sessionId);
 
+    if (session.total_questions === 0) {
+      throw new Error("No questions found for this quiz.");
+    }
+
+    // O(1) via index — fetch only the first question by order
     const firstQuestion = await ctx.db
       .query("questions")
-      .withIndex("by_quizId_order", (q) => q.eq("quizId", session.quizId))
-      .order("asc")
+      .withIndex("by_quizId_order", (q) =>
+        q.eq("quizId", session.quizId).eq("order_number", 0)
+      )
       .first();
 
     if (!firstQuestion) {
       throw new Error("No questions found for this quiz.");
     }
 
-    const timeLimitMs = firstQuestion.time_limit * 1000;
     const startTime = Date.now();
-    const endTime = startTime + timeLimitMs;
+    const endTime = startTime + firstQuestion.time_limit * 1000;
 
     await ctx.db.patch(args.sessionId, {
       status: "active",
+      current_question_id: firstQuestion._id,
       currentQuestionStartTime: startTime,
       currentQuestionEndTime: endTime,
     });
@@ -54,15 +60,9 @@ export const showLeaderboard = mutation({
   handler: async (ctx, args) => {
     const session = await checkHost(ctx, args.sessionId);
 
-    // Get all questions to check if this is the last one
-    const questions = await ctx.db
-      .query("questions")
-      .withIndex("by_quizId_order", (q) => q.eq("quizId", session.quizId))
-      .order("asc")
-      .collect();
-
-    // If we're on the last question, go directly to finished state
-    if (session.current_question_index === questions.length - 1) {
+    // O(1) — use cached total_questions instead of querying the questions table
+    if (session.current_question_index === session.total_questions - 1) {
+      // Last question → finish the quiz
       await ctx.db.patch(args.sessionId, {
         status: "finished",
         show_leaderboard: false,
@@ -83,37 +83,43 @@ export const nextQuestion = mutation({
   handler: async (ctx, args) => {
     const session = await checkHost(ctx, args.sessionId);
 
-    const questions = await ctx.db
-      .query("questions")
-      .withIndex("by_quizId_order", (q) => q.eq("quizId", session.quizId))
-      .order("asc")
-      .collect();
-
     const nextIndex = session.current_question_index + 1;
 
-    // If we're currently on the last question, go directly to finished state
-    if (session.current_question_index === questions.length - 1) {
+    // O(1) — compare against cached total_questions
+    if (session.current_question_index === session.total_questions - 1) {
+      // Already on the last question → finish
       await ctx.db.patch(args.sessionId, {
         status: "finished",
         show_leaderboard: false,
         currentQuestionStartTime: undefined,
         currentQuestionEndTime: undefined,
       });
-    } else if (nextIndex >= questions.length) {
-      // This shouldn't happen, but keep as fallback
+    } else if (nextIndex >= session.total_questions) {
+      // Fallback safety-net
       await ctx.db.patch(args.sessionId, {
         status: "finished",
         currentQuestionStartTime: undefined,
         currentQuestionEndTime: undefined,
       });
     } else {
-      const nextQuestion = questions[nextIndex];
-      const timeLimitMs = nextQuestion.time_limit * 1000;
+      // O(1) via composite index — fetch only the next question
+      const nextQ = await ctx.db
+        .query("questions")
+        .withIndex("by_quizId_order", (q) =>
+          q.eq("quizId", session.quizId).eq("order_number", nextIndex)
+        )
+        .first();
+
+      if (!nextQ) {
+        throw new Error("Next question not found.");
+      }
+
       const startTime = Date.now();
-      const endTime = startTime + timeLimitMs;
+      const endTime = startTime + nextQ.time_limit * 1000;
 
       await ctx.db.patch(args.sessionId, {
         current_question_index: nextIndex,
+        current_question_id: nextQ._id,
         show_leaderboard: false,
         reveal_answer: false,
         currentQuestionStartTime: startTime,

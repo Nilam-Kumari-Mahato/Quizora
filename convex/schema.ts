@@ -51,6 +51,14 @@ export default defineSchema({
     // Optional flag to indicate that the host ended the quiz early
     ended_early: v.optional(v.boolean()),
 
+    // --- Write-side metadata for O(1) lookups ---
+    // Cached total number of questions (set at session creation)
+    total_questions: v.number(),
+    // Direct reference to the current question document (avoids index scan)
+    current_question_id: v.optional(v.id("questions")),
+
+    // Server-authoritative timestamps (Unix ms) for timer sync:
+    //   clients compute  t_remaining = currentQuestionEndTime - Date.now()
     currentQuestionStartTime: v.optional(v.number()),
     currentQuestionEndTime: v.optional(v.number()),
 

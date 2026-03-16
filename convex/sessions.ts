@@ -48,6 +48,12 @@ export const createSession = mutation({
 
     if (!join_code) throw new Error("Failed to generate unique join code.");
 
+    // Write-side optimization: cache question count at session creation
+    const questions = await ctx.db
+      .query("questions")
+      .withIndex("by_quizId_order", (q) => q.eq("quizId", args.quizId))
+      .collect();
+
     const sessionId = await ctx.db.insert("quiz_sessions", {
       quizId: args.quizId,
       hostId: identity.subject,
@@ -55,6 +61,7 @@ export const createSession = mutation({
       status: "waiting",
       current_question_index: 0,
       show_leaderboard: false,
+      total_questions: questions.length,
     });
 
     return sessionId;
@@ -118,13 +125,8 @@ export const getHostSessionData = query({
       return null;
     }
 
-    const [quiz, questions, participants] = await Promise.all([
+    const [quiz, participants] = await Promise.all([
       ctx.db.get(session.quizId),
-      ctx.db
-        .query("questions")
-        .withIndex("by_quizId_order", (q) => q.eq("quizId", session.quizId))
-        .order("asc")
-        .collect(),
       ctx.db
         .query("participants")
         .withIndex("by_sessionId_score", (q) => q.eq("sessionId", args.sessionId))
@@ -134,7 +136,10 @@ export const getHostSessionData = query({
 
     if (!quiz) return null;
 
-    const currentQuestion = questions[session.current_question_index] || null;
+    // O(1) lookup via cached current_question_id
+    const currentQuestion = session.current_question_id
+      ? await ctx.db.get(session.current_question_id)
+      : null;
 
     let answerStats: Record<string, number> = {};
     if (session.show_leaderboard && currentQuestion) {
@@ -179,7 +184,7 @@ export const getHostSessionData = query({
       return a.total_time - b.total_time;  // Lower total time taken wins (faster)
     });
 
-    return { session, quiz, questions, participants: sortedParticipants, currentQuestion, answerStats };
+    return { session, quiz, totalQuestions: session.total_questions, participants: sortedParticipants, currentQuestion, answerStats };
   },
 });
 
@@ -195,13 +200,10 @@ export const getPlayerSessionData = query({
     const participant = await ctx.db.get(args.participantId);
     if (!participant || participant.sessionId !== args.sessionId) return null;
 
-    const questions = await ctx.db
-      .query("questions")
-      .withIndex("by_quizId_order", (q) => q.eq("quizId", session.quizId))
-      .order("asc")
-      .collect();
-
-    const currentQuestion = questions[session.current_question_index] || null;
+    // O(1) lookup via cached current_question_id
+    const currentQuestion = session.current_question_id
+      ? await ctx.db.get(session.current_question_id)
+      : null;
 
     const allParticipants = await ctx.db
       .query("participants")
@@ -305,7 +307,7 @@ export const getPlayerSessionData = query({
       hasAnswered,
       submittedAnswer: answerDoc?.answer || null,
       lastTimeTaken: answerDoc?.time_taken || null,
-      totalQuestions: questions.length,
+      totalQuestions: session.total_questions,
     };
   },
 });

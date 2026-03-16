@@ -25,7 +25,7 @@ const HostQuiz = () => {
 
   const session = sessionData?.session;
   const quiz = sessionData?.quiz;
-  const questions = sessionData?.questions;
+  const totalQuestions = sessionData?.totalQuestions;
   const participants = sessionData?.participants;
   const currentQuestion = sessionData?.currentQuestion;
 
@@ -220,7 +220,7 @@ const HostQuiz = () => {
 
               <div className="flex justify-between items-center mt-2">
                 <h2 className="text-xl font-bold dark:text-white">
-                  Question {session.current_question_index + 1} of {questions?.length}
+                  Question {session.current_question_index + 1} of {totalQuestions}
                 </h2>
                 <div className="flex items-center gap-2 text-warning">
                   <Clock className="h-5 w-5" />
