@@ -21,8 +21,8 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const AppContent = () => {
-  useUserSync(); // Sync user data with Convex on mount and auth changes
-  
+  useUserSync();
+
   return (
     <>
       <ThemeToggle />

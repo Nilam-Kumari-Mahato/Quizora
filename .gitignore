@@ -1,5 +1,6 @@
 #env files
 .env
+.env.local
 
 # Documentation files
 PERFORMANCE_IMPROVEMENTS.md
