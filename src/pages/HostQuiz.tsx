@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Play, SkipForward, Trophy, Clock, Loader2, ArrowLeft } from "lucide-react";
+import { Users, Play, SkipForward, Trophy, Clock, Loader2, ArrowLeft, Copy, Check } from "lucide-react";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -28,6 +28,16 @@ const HostQuiz = () => {
   const questions = sessionData?.questions;
   const participants = sessionData?.participants;
   const currentQuestion = sessionData?.currentQuestion;
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (session?.join_code) {
+      navigator.clipboard.writeText(session.join_code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({ title: "Code copied!" });
+    }
+  };
 
   const options = currentQuestion
     ? Object.keys(currentQuestion)
@@ -176,7 +186,22 @@ const HostQuiz = () => {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold mb-1 sm:mb-2 dark:text-white/80">{quiz?.title}</h1>
-              <p className="text-xs sm:text-sm md:text-base text-muted-foreground">Join Code: <span className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-bold text-orange-300">{session?.join_code}</span></p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs sm:text-sm md:text-base text-muted-foreground">Join Code: <span className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-bold text-orange-300">{session?.join_code}</span></p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopy}
+                  className="h-8 w-8 p-0 hover:bg-muted/50 transition-all duration-200"
+                  title="Copy Join Code"
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4 text-success animate-in zoom-in duration-200" />
+                  ) : (
+                    <Copy className="h-4 w-4 text-muted-foreground hover:text-orange-300" />
+                  )}
+                </Button>
+              </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
               {session?.status === 'finished' && (
@@ -222,7 +247,7 @@ const HostQuiz = () => {
                 <h2 className="text-xl font-bold dark:text-white">
                   Question {session.current_question_index + 1} of {questions?.length}
                 </h2>
-                <div className="flex items-center gap-2 text-warning">
+                <div className={`flex items-center gap-2 ${timeLeft <= 10 ? 'text-red-500 animate-pulse' : 'text-warning'}`}>
                   <Clock className="h-5 w-5" />
                   <span className="sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold">{timeLeft}s</span>
                 </div>

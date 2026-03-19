@@ -24,8 +24,8 @@ import AttemptDetails from "./pages/AttemptDetails";
 const queryClient = new QueryClient();
 
 const AppContent = () => {
-  useUserSync(); // Sync user data with Convex on mount and auth changes
-  
+  useUserSync();
+
   return (
     <>
       <ThemeToggle />

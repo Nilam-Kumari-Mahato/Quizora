@@ -1,33 +1,71 @@
+# 🤝 Contributing to Quizora
 
-# Contributing to Quizora
+Thank you for your interest in contributing to Quizora!  
+We appreciate all kinds of contributions — code, docs, bug reports, and ideas.
 
-Thank you for your interest in contributing! This guide will help you get started.
+---
 
-## Problem Statement
+## 🛠️ Before You Start
 
-Traditional learning and assessment methods often lack engagement and real-time feedback, leading to lower student participation.  
-**Rapid Quiz Relay** introduces a gamified, fast-paced environment where users can test their knowledge under time constraints, fostering competitive learning.
+- Make sure the project runs locally
+- Read the README.md completely
+- Create an issue before working on large changes
 
-## Focus Areas
-- Backend API development & real-time data handling
-- UI/UX improvements for seamless quiz transitions
-- Performance optimization for concurrent users
-- Gamification logic (Leaderboards, Relay timers)
+---
 
-## Student Contribution Guide
-Students can contribute by:
-- Enhancing the quiz engine
-- Implementing new question types
-- Optimizing the relay timer logic
+## 🌱 Branch Naming Convention
 
-## Milestones
-1. Setup environment and fix minor UI bugs  
-2. Implement user authentication and profile tracking  
-3. Develop real-time leaderboard and "Relay" mode features  
+- feature/short-description
+- fix/bug-name
+- docs/readme-update
 
-## How to Contribute
-1. Fork the repository  
-2. Create a new branch for your work  
-3. Make your changes / improvements  
-4. Commit with a clear message  
-5. Push to your fork and create a Pull Request to the main repository  
+---
+
+## 💬 Commit Message Format
+
+type: short description
+
+Examples:
+feat: add quiz auto-submit logic
+fix: prevent duplicate submissions
+docs: update setup instructions
+
+
+---
+
+## 🔁 Pull Request Process
+
+1. Fork the repository
+2. Create a new branch from `main`
+3. Make your changes
+4. Test locally
+5. Open a Pull Request with:
+   - Clear description
+   - Screenshots (if UI changes)
+   - Related issue number
+
+---
+
+## ❌ What NOT to Commit
+
+- `.env` files
+- Convex generated files
+- Clerk secrets
+- Build artifacts
+
+---
+
+## 🧪 Code Quality Guidelines
+
+- Keep logic server-driven when possible
+- Avoid client-side authority for time & scoring
+- Write clean, readable code
+
+---
+
+## 🙌 Code of Conduct
+
+Be respectful and constructive.  
+Harassment or toxic behavior will not be tolerated.
+
+Happy hacking! 🚀

@@ -340,19 +340,11 @@ const displayScore = isMiniMode
           session?.status !== "finished" && (
           <Card className="p-4 bg-card border-border rounded-3xl animate-in fade-in slide-in-from-right-5 duration-500">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-base font-semibold text-muted-foreground">Question {session?.current_question_index + 1} of {totalQuestions}</h3>
-              {/* <div className="flex items-center gap-2 text-secondary">
+              <h3 className="text-base font-semibold text-muted-foreground">Question {session.current_question_index + 1} of {totalQuestions}</h3>
+              <div className={`flex items-center gap-2 ${timeLeft <= 10 ? 'text-red-500 animate-pulse' : 'text-secondary'}`}>
                 <Clock className="h-4 w-4" />
-                <span className="text-xl font-bold text-secondary">{timeLeft}s</span>
-              </div> */}
-              {!isMiniMode && (
-                <Progress.Root>
-                  <div className="flex items-center gap-2 text-secondary">
-                    <Clock className="h-4 w-4" />
-                    <span className="text-xl font-bold text-secondary">{timeLeft}s</span>
-                  </div>
-                </Progress.Root>
-              )}
+                <span className="text-xl font-bold">{timeLeft}s</span>
+              </div>
             </div>
             {!isMiniMode &&(
               <Progress.Root
