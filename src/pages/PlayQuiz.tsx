@@ -12,28 +12,64 @@ import { Id } from "../../convex/_generated/dataModel";
 import { Progress } from "@chakra-ui/react";
 import { useAuth } from "@clerk/clerk-react";
 
+type PlayerSessionData = {
+  session: any;
+  quiz: any;
+  participant: any;
+  allParticipants: any[];
+  currentQuestion: any;
+  answerStats: Record<string, number>;
+  hasAnswered: boolean;
+  questions: any[];
+  participantAnswers: any[];
+  submittedAnswer: string | null;
+  lastTimeTaken: number | null;
+  totalQuestions: number;
+  originalAttemptData?: { score: number } | null;
+};
+
 const PlayQuiz = () => {
   const { sessionId } = useParams();
   const [searchParams] = useSearchParams();
+  const reviewMode = searchParams.get("review");
   const participantId = searchParams.get('participant');
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isSignedIn } = useAuth();
-
+  const advanceMiniSession = useMutation(api.sessions.advanceMiniSession);
+  const startReviewSession = useQuery(api.sessions.startReviewSession, {
+  sessionId: sessionId as Id<"quiz_sessions">,
+  participantId: participantId as Id<"participants">
+  });
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [miniFeedback, setMiniFeedback] = useState({
+    show: false,
+    correct: false,
+  });
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [progressPercent, setProgressPercent] = useState(100);
+  const [timeUpNotified, setTimeUpNotified] = useState(false);
 
   const sessionData = useQuery(
     api.sessions.getPlayerSessionData,
     sessionId && participantId
-      ? {
+    ? {
         sessionId: sessionId as Id<"quiz_sessions">,
         participantId: participantId as Id<"participants">
       }
-      : "skip"
-  );
-
+    : "skip"
+  ) as PlayerSessionData | undefined | null;
   const submitAnswerMutation = useMutation(api.gameplay.submitAnswer);
+  const createMistakeMiniSession = useMutation(api.sessions.createMistakeMiniSession);
+  const joinSession = useMutation(api.sessions.joinSession);
+  // console.log("SessionData:", sessionData);
 
+  // if (sessionData === undefined) {
+  //   return <div>Loading...</div>;
+  // }
+  // if (sessionData === null) {
+  //   return <div>Session Not Found</div>;
+  // }
   const session = sessionData?.session;
   const quiz = sessionData?.quiz;
   const participant = sessionData?.participant;
@@ -42,30 +78,44 @@ const PlayQuiz = () => {
   const answerStats = sessionData?.answerStats;
   const totalQuestions = sessionData?.totalQuestions;
 
+  const isMiniMode = session?.mode === "mistake_mini";
+
   const hasAnswered = (sessionData as any)?.hasAnswered ?? false;
   const submittedAnswer = (sessionData as any)?.submittedAnswer ?? null;
 
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [progressPercent, setProgressPercent] = useState(100);
-  const [timeUpNotified, setTimeUpNotified] = useState(false);
+  
+  console.log("status:", session?.status);
+console.log("index:", session?.current_question_index);
+console.log("totalQuestions:", totalQuestions);
+console.log("isMiniMode:", isMiniMode);
+
+const miniSessionScore =
+  isMiniMode && sessionData?.participantAnswers
+    ? sessionData.participantAnswers.filter((a: any) => a.is_correct).length : 0;
+
+const displayScore = isMiniMode
+  ? miniSessionScore
+ : sessionData?.participant?.score;
 
   useEffect(() => {
     setSelectedAnswer(null);
     setTimeUpNotified(false);
   }, [currentQuestion?._id]);
   useEffect(() => {
-
-    if (hasAnswered && submittedAnswer) {
-      setSelectedAnswer(submittedAnswer);
-    }
-  }, [hasAnswered, submittedAnswer]);
+  if (!isMiniMode && hasAnswered && submittedAnswer) {
+    setSelectedAnswer(submittedAnswer);
+  }
+  }, [hasAnswered, submittedAnswer, isMiniMode]); 
 
   useEffect(() => {
     if (!session) {
       return;
     }
 
-    if (session.status === 'active' && !session.show_leaderboard && session.currentQuestionEndTime) {
+    if (!isMiniMode &&
+    session?.status === 'active' &&
+    !session?.show_leaderboard &&
+    session.currentQuestionEndTime) {
       const updateTimer = () => {
         const now = Date.now();
         const remainingMs = session.currentQuestionEndTime! - now;
@@ -88,7 +138,7 @@ const PlayQuiz = () => {
       const timer = setInterval(updateTimer, 100);
       return () => clearInterval(timer);
 
-    } else if (session.status === 'waiting' && currentQuestion) {
+    } else if (session?.status === 'waiting' && currentQuestion) {
       setTimeLeft(currentQuestion.time_limit);
       setProgressPercent(100);
     }
@@ -101,53 +151,60 @@ const PlayQuiz = () => {
     timeUpNotified,
     toast,
   ]);
+    // console.log("SessionData:", sessionData);
 
+  if (sessionData === undefined) {
+    return <div>Loading...</div>;
+  }
+  if (sessionData === null) {
+    return <div>Session Not Found</div>;
+  }
 
   const handleOptionSelect = (option: string) => {
-    if (hasAnswered || timeLeft === 0) return;
+    if (!isMiniMode && hasAnswered || timeLeft === 0) return;
     setSelectedAnswer(option);
   };
 
   const submitAnswer = async () => {
-    if (hasAnswered || !selectedAnswer || !currentQuestion || !sessionId || !participantId) return;
+    if ((!isMiniMode && hasAnswered) || !selectedAnswer || !currentQuestion || !sessionId || !participantId) return;
 
-    // Validate session data before submission
-    if (!session?.currentQuestionStartTime) {
-      toast({
-        title: "Error",
-        description: "Unable to submit answer. Please try again.",
-        variant: "destructive"
+    let time_taken = 0;
+    let client_timestamp = Date.now();
+    if (!isMiniMode) {
+      if (!session?.currentQuestionStartTime) {
+        toast({
+          title: "Error",
+          description: "Unable to submit answer.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      client_timestamp = Date.now();
+      time_taken = (client_timestamp - session.currentQuestionStartTime) / 1000;
+    }
+
+    await submitAnswerMutation({
+      participantId: participantId as Id<"participants">,
+      questionId: currentQuestion._id,
+      sessionId: sessionId as Id<"quiz_sessions">,
+      answer: selectedAnswer,
+      time_taken,
+      client_timestamp,
+    });
+
+    if (isMiniMode) {
+      const correct = selectedAnswer === currentQuestion.correct_answer;
+
+      setMiniFeedback({
+        show: true,
+        correct: Boolean(correct),
       });
+
       return;
     }
 
-    // Capture the exact moment of submission
-    const client_timestamp = Date.now();
-
-    const time_taken = (client_timestamp - session.currentQuestionStartTime) / 1000;
-
-    try {
-      const result = await submitAnswerMutation({
-        participantId: participantId as Id<"participants">,
-        questionId: currentQuestion._id,
-        sessionId: sessionId as Id<"quiz_sessions">,
-        answer: selectedAnswer,
-        time_taken: time_taken,
-        client_timestamp: client_timestamp,
-      });
-
-      if (result?.success) {
-        toast({ title: "Answer submitted!" });
-      } else if (result?.reason === "already_answered") {
-        toast({
-          title: "Already Answered",
-          description: "You've already submitted an answer for this question",
-          variant: "destructive"
-        });
-      }
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
+    toast({ title: "Answer submitted!" });
   };
 
   // Handle loading state
@@ -159,8 +216,20 @@ const PlayQuiz = () => {
     );
   }
 
+// const reviewSession = useQuery(api.sessions.startReviewSession, {
+//   sessionId: sessionId as Id<"quiz_sessions">,
+//   participantId: participantId as Id<"participants">
+// });
+
   // Handle not found or invalid participant
   if (sessionData === null) {
+    if (!currentQuestion && session?.status === "active") {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <p className="text-lg text-muted-foreground">Loading question...</p>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen flex flex-col items-center justify-center">
         <h1 className="text-4xl font-bold mb-4">Session Not Found</h1>
@@ -190,13 +259,47 @@ const PlayQuiz = () => {
 
   const rankText = playerRank ? getOrdinal(playerRank) : "-";
   const lastTimeText = (sessionData as any)?.lastTimeTaken ? `${(sessionData as any).lastTimeTaken.toFixed(1)}s` : "-";
-
+  
   const currentParticipant = allParticipants?.find(p => p._id === participantId);
   const totalVotingTime = (currentParticipant as any)?.total_time ? `${(currentParticipant as any).total_time.toFixed(1)}s` : "-";
 
+  //  if (sessionData === undefined) {
+  //   return <div>Loading...</div>;
+  // }
+
+  // if (sessionData === null) {
+  //   return <div>Session Not Found</div>;
+  // }
+  const getOptionText = (question: any, option: string | undefined) => {
+    if (!option) return "Not answered";
+
+    const map: any = {
+      A: question.option_a,
+      B: question.option_b,
+      C: question.option_c,
+      D: question.option_d,
+    };
+
+    return map[option];
+  };
+  const participantAnswers = (sessionData as any)?.participantAnswers || [];
+
+  const mistakes = sessionData?.participantAnswers?.filter(
+    (a: any) => !a.is_correct
+  ) || [];
+
+  const showCelebration =
+  session?.status === "finished" &&
+  isMiniMode &&
+  mistakes.length === 0;
+
+
+  const remainingMistakes =
+  sessionData?.participantAnswers?.filter((a: any) => !a.is_correct) || [];
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-200/30 via-zinc-200/80 to-zinc-200/80 dark:bg-gradient-to-b dark:from-black/80 dark:via-black/80 dark:to-black/80 pt-4 pb-4 ">
-      <div className="container max-w-md sm:max-w-2xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mt-12">
+      {/* <div className="container max-w-md sm:max-w-2xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mt-12"> */}
+      <div className="container w-full max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mt-12 px-4">
         <Card className="px-3 sm:px-4 md:px-5 lg:px-6 py-1.5 sm:py-2 md:py-2.5 lg:py-3 mb-6">
           <div className="flex justify-between items-center gap-3 sm:gap-4">
             <div className="flex-1 min-w-0">
@@ -216,13 +319,13 @@ const PlayQuiz = () => {
               )}
               <div className="text-right flex-shrink-0">
                 <p className="text-xs sm:text-sm text-muted-foreground">Your Score</p>
-                <p className="text-lg sm:text-xl md:text-2xl font-bold text-secondary">{participant?.score || 0}</p>
-              </div>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-secondary">{displayScore || 0}</p>
+        </div>
             </div>
           </div>
         </Card>
 
-        {session.status === 'waiting' && (
+        {session?.status === 'waiting' && !isMiniMode && (
           <Card className="p-12 text-center animate-in fade-in zoom-in-95 duration-500">
             <h2 className="text-3xl font-bold mb-4 dark:text-zinc-300">Get Ready!</h2>
             <p className="text-xl text-muted-foreground">
@@ -231,7 +334,10 @@ const PlayQuiz = () => {
           </Card>
         )}
 
-        {session.status === 'active' && !session.show_leaderboard && currentQuestion && (
+          {(session?.status === 'active' || isMiniMode) &&
+          (!session?.show_leaderboard || isMiniMode) &&
+          currentQuestion &&
+          session?.status !== "finished" && (
           <Card className="p-4 bg-card border-border rounded-3xl animate-in fade-in slide-in-from-right-5 duration-500">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-base font-semibold text-muted-foreground">Question {session.current_question_index + 1} of {totalQuestions}</h3>
@@ -240,71 +346,72 @@ const PlayQuiz = () => {
                 <span className="text-xl font-bold">{timeLeft}s</span>
               </div>
             </div>
+            {!isMiniMode &&(
+              <Progress.Root
+                value={progressPercent}
+                colorPalette={timeLeft <= 5 ? "orange" : "gray"}
+                size="sm"
+                css={{
+                  '& [data-part="track"]': {
+                    borderRadius: '9999px',
+                    overflow: 'hidden',
+                    backgroundColor: 'light-dark(rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.1))'
+                  },
+                  '& [data-part="range"]': {
+                    borderRadius: '9999px',
+                    background: (() => {
+                      if (!currentQuestion?.time_limit) return 'light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7))';
 
-            <Progress.Root
-              value={progressPercent}
-              colorPalette={timeLeft <= 5 ? "orange" : "gray"}
-              size="sm"
-              css={{
-                '& [data-part="track"]': {
-                  borderRadius: '9999px',
-                  overflow: 'hidden',
-                  backgroundColor: 'light-dark(rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.1))'
-                },
-                '& [data-part="range"]': {
-                  borderRadius: '9999px',
-                  background: (() => {
-                    if (!currentQuestion?.time_limit) return 'light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7))';
+                      // Calculate time thresholds as percentages
+                      const timeLimit = currentQuestion.time_limit;
+                      const tenSecPercent = (10 / timeLimit) * 100;
+                      const fiveSecPercent = (5 / timeLimit) * 100;
+                      const fourPointSevenFiveSecPercent = (4.75 / timeLimit) * 100;
 
-                    // Calculate time thresholds as percentages
-                    const timeLimit = currentQuestion.time_limit;
-                    const tenSecPercent = (10 / timeLimit) * 100;
-                    const fiveSecPercent = (5 / timeLimit) * 100;
-                    const fourPointSevenFiveSecPercent = (4.75 / timeLimit) * 100;
-
-                    // Three-stage color transition
-                    // Light mode: zinc-400 (lighter gray) → butter yellow → softer orange
-                    // Dark mode: white (70% opacity) → butter yellow → softer orange
-                    if (progressPercent > tenSecPercent) {
-                      // Stage 1: zinc-400 (light) or white 70% (dark)
-                      return `linear-gradient(90deg, 
-                        light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7)) 0%, 
-                        light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7)) 50%,
-                        light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7)) 100%)`;
-                    } else if (progressPercent > fiveSecPercent) {
-                      // Stage 2: Blend to butter yellow (10s to 5s)
-                      const yellowBlend = ((tenSecPercent - progressPercent) / (tenSecPercent - fiveSecPercent)) * 100;
-                      return `linear-gradient(90deg, 
-                        color-mix(in srgb, rgb(255, 223, 128) ${yellowBlend}%, light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7))) 0%, 
-                        color-mix(in srgb, rgb(255, 215, 100) ${yellowBlend}%, light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7))) 50%,
-                        color-mix(in srgb, rgb(255, 207, 80) ${yellowBlend}%, light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7))) 100%)`;
-                    } else if (progressPercent > fourPointSevenFiveSecPercent) {
-                      // Stage 3: Quick blend from butter yellow to softer orange (5s to 4.75s)
-                      const orangeBlend = ((fiveSecPercent - progressPercent) / (fiveSecPercent - fourPointSevenFiveSecPercent)) * 100;
-                      return `linear-gradient(90deg, 
-                        color-mix(in srgb, rgba(251, 146, 60, 0.85) ${orangeBlend}%, rgb(255, 223, 128)) 0%, 
-                        color-mix(in srgb, rgba(249, 115, 22, 0.85) ${orangeBlend}%, rgb(255, 215, 100)) 50%,
-                        color-mix(in srgb, rgba(234, 88, 12, 0.85) ${orangeBlend}%, rgb(255, 207, 80)) 100%)`;
-                    } else {
-                      // Stage 4: Softer orange (< 4.75s)
-                      return `linear-gradient(90deg, 
-                        rgba(251, 146, 60, 0.85) 0%, 
-                        rgba(249, 115, 22, 0.85) 50%,
-                        rgba(234, 88, 12, 0.85) 100%)`;
-                    }
-                  })(),
-                  transition: 'width 0.1s linear',
-                  willChange: 'width, background',
-                  boxShadow: timeLeft <= 5
-                    ? `0 0 ${10 + (5 - timeLeft) * 2}px rgba(249, 115, 22, ${0.2 + (5 - timeLeft) * 0.04})`
-                    : 'light-dark(0 0 5px rgba(161, 161, 170, 0.25), 0 0 5px rgba(255, 255, 255, 0.15))'
-                }
-              }}
-            >
+                      // Three-stage color transition
+                      // Light mode: zinc-400 (lighter gray) → butter yellow → softer orange
+                      // Dark mode: white (70% opacity) → butter yellow → softer orange
+                      if (progressPercent > tenSecPercent) {
+                        // Stage 1: zinc-400 (light) or white 70% (dark)
+                        return `linear-gradient(90deg, 
+                          light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7)) 0%, 
+                          light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7)) 50%,
+                          light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7)) 100%)`;
+                      } else if (progressPercent > fiveSecPercent) {
+                        // Stage 2: Blend to butter yellow (10s to 5s)
+                        const yellowBlend = ((tenSecPercent - progressPercent) / (tenSecPercent - fiveSecPercent)) * 100;
+                        return `linear-gradient(90deg, 
+                          color-mix(in srgb, rgb(255, 223, 128) ${yellowBlend}%, light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7))) 0%, 
+                          color-mix(in srgb, rgb(255, 215, 100) ${yellowBlend}%, light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7))) 50%,
+                          color-mix(in srgb, rgb(255, 207, 80) ${yellowBlend}%, light-dark(rgba(161, 161, 170, 0.8), rgba(255, 255, 255, 0.7))) 100%)`;
+                      } else if (progressPercent > fourPointSevenFiveSecPercent) {
+                        // Stage 3: Quick blend from butter yellow to softer orange (5s to 4.75s)
+                        const orangeBlend = ((fiveSecPercent - progressPercent) / (fiveSecPercent - fourPointSevenFiveSecPercent)) * 100;
+                        return `linear-gradient(90deg, 
+                          color-mix(in srgb, rgba(251, 146, 60, 0.85) ${orangeBlend}%, rgb(255, 223, 128)) 0%, 
+                          color-mix(in srgb, rgba(249, 115, 22, 0.85) ${orangeBlend}%, rgb(255, 215, 100)) 50%,
+                          color-mix(in srgb, rgba(234, 88, 12, 0.85) ${orangeBlend}%, rgb(255, 207, 80)) 100%)`;
+                      } else {
+                        // Stage 4: Softer orange (< 4.75s)
+                        return `linear-gradient(90deg, 
+                          rgba(251, 146, 60, 0.85) 0%, 
+                          rgba(249, 115, 22, 0.85) 50%,
+                          rgba(234, 88, 12, 0.85) 100%)`;
+                      }
+                    })(),
+                    transition: 'width 0.1s linear',
+                    willChange: 'width, background',
+                    boxShadow: timeLeft <= 5
+                      ? `0 0 ${10 + (5 - timeLeft) * 2}px rgba(249, 115, 22, ${0.2 + (5 - timeLeft) * 0.04})`
+                      : 'light-dark(0 0 5px rgba(161, 161, 170, 0.25), 0 0 5px rgba(255, 255, 255, 0.15))'
+                  }
+                }}
+              >
               <Progress.Track>
                 <Progress.Range />
               </Progress.Track>
             </Progress.Root>
+            )}
 
             <div className="mt-4 mb-6">
               <p className="text-xl font-bold mb-4 bg-muted p-2 rounded-lg">{currentQuestion.question_text}</p>
@@ -324,7 +431,7 @@ const PlayQuiz = () => {
 
                 const isSelected = selectedAnswer === option;
                 // Stats are only shown when the user has answered and leaderboard is on
-                const showStats = hasAnswered && session.show_leaderboard;
+                const showStats = hasAnswered && session?.show_leaderboard;
                 const percentage = 0;
                 // Determine if this option is the correct one to highlight when host reveals
                 const isCorrect = !!currentQuestion?.correct_answer && session?.reveal_answer && currentQuestion.correct_answer === option;
@@ -371,33 +478,79 @@ const PlayQuiz = () => {
               })}
             </div>
 
-            {!hasAnswered ? (
-              <div className="flex justify-center">
-                <Button
-                  onClick={submitAnswer}
-                  disabled={!selectedAnswer || timeLeft === 0}
-                  size="lg"
-                  className="w-56 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
-                >
-                  Submit Answer
-                </Button>
-              </div>
+            {isMiniMode ? (
+              <>
+                {!miniFeedback.show ? (
+                  <div className="flex justify-center">
+                    <Button
+                      onClick={submitAnswer}
+                      disabled={!selectedAnswer}
+                      size="lg"
+                      className="w-56 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
+                    >
+                      Check Answer
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mt-4 text-center">
+                    {miniFeedback.correct ? (
+                      <p className="text-green-500 font-bold text-lg">Correct! 🎉</p>
+                    ) : (
+                      <>
+                        <p className="text-red-500 font-bold text-lg">Wrong ❌</p>
+                        <p className="text-green-500">
+                          Correct Answer: {currentQuestion.correct_answer}
+                        </p>
+                      </>
+                    )}
+
+                    <Button
+                      className="mt-4"
+                      onClick={async () => {
+                        await advanceMiniSession({
+                          sessionId: sessionId as Id<"quiz_sessions">,
+                        });
+
+                        setMiniFeedback({ show: false, correct: false });
+                        setSelectedAnswer(null);
+                      }}
+                    >
+                    Next Question
+                    </Button>
+                  </div>
+                )}
+              </>
             ) : (
-              <p className="text-center text-base font-semibold text-secondary">
-                <Loader2 className="inline-block mr-2 h-4 w-4 animate-spin" />
-                Answer submitted! Waiting for the host...
-              </p>
+              <>
+                {!hasAnswered ? (
+                  <div className="flex justify-center">
+                    <Button
+                      onClick={submitAnswer}
+                      disabled={!selectedAnswer || timeLeft === 0}
+                      size="lg"
+                      className="w-56 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
+                    >
+                      Submit Answer
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-center text-base font-semibold text-secondary">
+                    <Loader2 className="inline-block mr-2 h-4 w-4 animate-spin" />
+                    Answer submitted! Waiting for the host...
+                  </p>
+                )}
+              </>
             )}
           </Card>
         )}
 
-        {session.status === 'active' && session.show_leaderboard && (
+        {session?.status === 'active' && session?.show_leaderboard && (
           <Card className="p-4 text-center animate-in fade-in slide-in-from-left-5 duration-500">
             <Trophy className="h-14 w-14 md:h-16 md:w-16 lg:h-20 lg:w-20  mx-auto mb-4 text-warning" />
             <h2 className="text-xl sm:text-xl md:text-2xl lg:text-2xl xl:text-3xl  font-bold mb-8 dark:text-zinc-200">Current Standings</h2>
             <div className="mb-8">
               <h4 className="text-lg sm:text-lg md:text-xl lg:text-xl xl:text-xl dark:text-white/90 font-semibold">Your Position - {rankText}</h4>
-              <p className="text-sm dark:text-white/70">Correct answers: {participant?.score || 0}</p>
+              <p className="text-sm dark:text-white/70">Correct answers: {displayScore || 0}</p>
               <p className="text-sm dark:text-white/70">Total voting time: {totalVotingTime}</p>
             </div>
             <div className="space-y-3">
@@ -427,7 +580,123 @@ const PlayQuiz = () => {
           </Card>
         )}
 
-        {session.status === 'finished' && (
+        {showCelebration && (
+          <Card className="p-8 text-center animate-in zoom-in-95 duration-700">
+
+            <DotLottieReact
+              src="https://ik.imagekit.io/devsoc/Quizora/public/Trophy.lottie"
+              autoplay
+              className="h-40 w-40 mx-auto"
+            />
+            
+            <h2 className="text-3xl font-bold mt-4">
+              Way to Go Champ!
+            </h2>
+
+            <p className="text-lg text-muted-foreground mt-2">
+              You mastered these Questions!
+            </p>
+
+            <p className="text-xl font-semibold mt-4">
+              Score: {miniSessionScore} / {totalQuestions}
+            </p>
+
+            <div className="flex justify-center gap-4 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => navigate("/dashboard")}
+              >
+                Back to Dashboard
+              </Button>
+
+            </div>
+
+          </Card>
+        )}
+        {session?.status === 'finished' && isMiniMode && !showCelebration && (
+          <Card className="p-6 animate-in fade-in zoom-in-95 duration-700">
+            <h2 className="text-3xl font-bold mb-4 text-center">
+              Practice Complete
+            </h2>
+
+            <p className="text-center text-lg mb-6">
+              Your Score: {miniSessionScore} / {totalQuestions}
+            </p>
+
+            {/* <div className="space-y-4"> */}
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+              {sessionData?.questions?.map((q, index) => {
+                const answer = sessionData?.participantAnswers?.find(
+                  (a: any) => a.questionId === q._id
+                );
+
+                const correct = answer?.answer === q.correct_answer;
+
+                console.log(
+                  "Wrong answers exist:",
+                  sessionData?.participantAnswers?.some((a: any) => !a.is_correct)
+                );
+                return (
+                  <div
+                    key={q._id}
+                    className="p-4 rounded-lg border bg-muted"
+                  >
+                    <p className="font-semibold mb-2 break-words">
+                      Q{index + 1}. {q.question_text}
+                    </p>
+
+                    <p className={correct ? "text-green-600" : "text-red-600"}>
+                      Your Answer - {answer?.answer} : {getOptionText(q, answer?.answer)}
+                    </p>
+
+                    {!correct && (
+                      <p className="text-green-600">
+                        Correct Answer - {q.correct_answer} : {getOptionText(q, q.correct_answer)}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* <div className="flex justify-center gap-4 mt-6"> */}
+            <div className="flex flex-col sm:flex-row justify-center gap-3 mt-6">
+              {session?.status === "finished" && isMiniMode && (
+                <Button
+                  onClick={async () => {
+                    const result = await createMistakeMiniSession({
+                      originalSessionId: sessionId as Id<"quiz_sessions">,
+                      participantId: participantId as Id<"participants">
+                    });
+
+                    if (!result.sessionId || !result.join_code) {
+                      alert("No more mistakes to review!");
+                      return;
+                    }
+
+                    const joinResult = await joinSession({
+                      join_code: result.join_code,
+                      name: participant?.name || "Player"
+                    });
+
+                    navigate(`/play/${joinResult.sessionId}?participant=${joinResult.participantId}`, { replace: true });
+                  }}
+                >
+                  Review Mistakes
+                </Button>
+              )}
+
+              <Button
+                variant="outline"
+                onClick={() => navigate("/dashboard")}
+              >
+                Back to Dashboard
+              </Button>
+
+            </div>
+          </Card>
+        )}
+        {session?.status === 'finished' && !isMiniMode && (
           <Card className="px-5 py-8 text-center animate-in fade-in zoom-in-95 duration-700">
             {session.ended_early ? (
               // Quiz ended early by host
@@ -455,7 +724,7 @@ const PlayQuiz = () => {
                 <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-3xl xl:text-4xl  font-bold mb-2 dark:text-zinc-300">Final Leaderboard!</h2>
                 <div className="my-5">
                   <h4 className="text-xl font-semibold dark:text-white/90">You finished {rankText}!</h4>
-                  <p className="text-sm dark:text-white/70">Correct answers: {participant?.score || 0}</p>
+                  <p className="text-sm dark:text-white/70">Correct answers: {displayScore || 0}</p>
                   <p className="text-sm dark:text-white/70">Total voting time: {totalVotingTime}</p>
                 </div>
                 <div className="space-y-3 dark:text-zinc-200">
@@ -490,5 +759,6 @@ const PlayQuiz = () => {
     </div >
   );
 };
+
 
 export default PlayQuiz;

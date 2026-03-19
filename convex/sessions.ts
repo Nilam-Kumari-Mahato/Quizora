@@ -1,7 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { Doc } from "./_generated/dataModel";
-
+import { Doc, Id } from "./_generated/dataModel";
 // Helper function to generate a 6-character join code
 const generateJoinCode = () => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -10,6 +9,20 @@ const generateJoinCode = () => {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
+};
+
+const generateUniqueJoinCode = async (ctx: any) => {
+  for (let i = 0; i < 10; i++) {
+    const candidate = generateJoinCode();
+    const exists = await ctx.db
+      .query("quiz_sessions")
+      .withIndex("by_join_code", (q:any) => q.eq("join_code", candidate))
+      .first();
+    if (!exists) {
+      return candidate;
+    }
+  }
+  throw new Error("Failed to generate unique join code.");
 };
 
 export const createSession = mutation({
@@ -33,20 +46,7 @@ export const createSession = mutation({
     }
 
     // Generate unique join code
-    let join_code: string | undefined;
-    for (let i = 0; i < 10; i++) {
-      const candidate = generateJoinCode();
-      const exists = await ctx.db
-        .query("quiz_sessions")
-        .withIndex("by_join_code", (q) => q.eq("join_code", candidate))
-        .first();
-      if (!exists) {
-        join_code = candidate;
-        break;
-      }
-    }
-
-    if (!join_code) throw new Error("Failed to generate unique join code.");
+    const join_code = await generateUniqueJoinCode(ctx);
 
     // Write-side optimization: cache question count at session creation
     const questions = await ctx.db
@@ -87,25 +87,29 @@ export const getSessionByJoinCode = query({
     };
   },
 });
-
+// console.log("Join code:", result.join_code);
 
 export const joinSession = mutation({
   args: { join_code: v.string(), name: v.string() },
   handler: async (ctx, args) => {
     const session = await ctx.db
       .query("quiz_sessions")
-      .withIndex("by_join_code", (q) => q.eq("join_code", args.join_code.toUpperCase()))
+      .withIndex("by_join_code", (q) => q.eq("join_code", args.join_code.replace(/\s/g, "").toUpperCase()))
       .first();
 
     if (!session) throw new Error("Quiz code not found.");
 
-    if (session.status !== "waiting")
+    if (session.status !== "waiting" && session.mode !== "mistake_mini") {
       throw new Error("This quiz has already started.");
+    }
+
+    const identity = await ctx.auth.getUserIdentity();
 
     const participantId = await ctx.db.insert("participants", {
       sessionId: session._id,
       name: args.name,
       score: 0,
+      userId: identity?.subject,
     });
 
     return { sessionId: session._id, participantId };
@@ -188,6 +192,73 @@ export const getHostSessionData = query({
   },
 });
 
+
+export const createMistakeMiniSession = mutation({
+  args: {
+    originalSessionId: v.id("quiz_sessions"),
+    participantId: v.id("participants"),
+  },
+
+  handler: async (ctx, args) => {
+    const originalSession = await ctx.db.get(args.originalSessionId);
+    if (!originalSession) throw new Error("Session not found");
+
+    // Determine the scope of questions to check for mistakes
+    // let scopeQuestionIds: string[];
+    let scopeQuestionIds: Id<"questions">[];
+    if (originalSession.customQuestionIds) {
+      // If reviewing a mini-session, only check questions from that session
+      scopeQuestionIds = originalSession.customQuestionIds;
+    } else {
+      // If reviewing original session, check all questions in the quiz
+      const allQuestions = await ctx.db
+        .query("questions")
+        .withIndex("by_quizId_order", (q) => q.eq("quizId", originalSession.quizId))
+        .collect();
+      scopeQuestionIds = allQuestions.map((q) => q._id);
+    }
+
+    const answers = await ctx.db
+      .query("answers")
+      .withIndex("by_participant_session", (q) =>
+        q.eq("participantId", args.participantId)
+         .eq("sessionId", args.originalSessionId)
+      )
+      .collect();
+
+    // Identify mistakes: questions in scope that were NOT answered correctly
+    const correctQuestionIds = new Set(
+      answers.filter((a) => a.is_correct).map((a) => a.questionId)
+    );
+
+    const mistakeQuestionIds = scopeQuestionIds.filter(
+      (qId) => !correctQuestionIds.has(qId)
+    );
+
+    if (mistakeQuestionIds.length === 0) {
+      return { sessionId: null, join_code: null };
+    }
+
+    const join_code = await generateUniqueJoinCode(ctx);
+
+    const newSessionId = await ctx.db.insert("quiz_sessions", {
+      quizId: originalSession.quizId,
+      hostId: originalSession.hostId,
+      join_code,
+      status: "active",
+      mode: "mistake_mini",
+      current_question_index: 0,
+      show_leaderboard: false,
+      customQuestionIds: mistakeQuestionIds,
+      currentQuestionStartTime: Date.now(),
+      // Propagate original attempt info to show score correctly in mini-mode
+      originalSessionId: originalSession.originalSessionId ?? args.originalSessionId,
+      originalParticipantId: originalSession.originalParticipantId ?? args.participantId,
+    });
+
+    return { sessionId: newSessionId, join_code };
+  },
+});
 export const getPlayerSessionData = query({
   args: {
     sessionId: v.id("quiz_sessions"),
@@ -196,14 +267,47 @@ export const getPlayerSessionData = query({
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
     if (!session) return null;
-
+    const participantAnswers = await ctx.db
+    .query("answers")
+    .withIndex("by_participant_session", (q) =>
+      q.eq("participantId", args.participantId)
+      .eq("sessionId", args.sessionId)
+    )
+    .collect();
     const participant = await ctx.db.get(args.participantId);
     if (!participant || participant.sessionId !== args.sessionId) return null;
 
-    // O(1) lookup via cached current_question_id
-    const currentQuestion = session.current_question_id
-      ? await ctx.db.get(session.current_question_id)
-      : null;
+    let originalAttemptData: { score: number } | null = null;
+    if (session.mode === "mistake_mini" && session.originalParticipantId) {
+      const originalParticipant = await ctx.db.get(
+        session.originalParticipantId
+      );
+      if (originalParticipant) {
+        originalAttemptData = { score: originalParticipant.score };
+      }
+    }
+
+    let questions: Doc<"questions">[] = [];
+
+      if (session.mode === "mistake_mini" && session.customQuestionIds) {
+        const fetched = await Promise.all(
+          session.customQuestionIds.map((id) => ctx.db.get(id))
+        );
+
+        questions = fetched.filter((q): q is Doc<"questions"> => q !== null);
+
+      } else {
+
+        questions = await ctx.db
+          .query("questions")
+          .withIndex("by_quizId_order", (q) =>
+            q.eq("quizId", session.quizId)
+          )
+          .collect();
+      }
+
+
+    const currentQuestion = questions[session.current_question_index] || null;
 
     const allParticipants = await ctx.db
       .query("participants")
@@ -216,7 +320,7 @@ export const getPlayerSessionData = query({
     let answerDoc: Doc<"answers"> | null = null;
 
     // Map of participantId -> score awarded for the current question (if any)
-    const currentQuestionScores: Record<string, number> = {};
+    const currentQuestionScores: Record<string, number> = {} as Record<string, number>;
 
     if (currentQuestion) {
       answerDoc = await ctx.db
@@ -247,7 +351,7 @@ export const getPlayerSessionData = query({
           if (answerStats[opt] === undefined) answerStats[opt] = 0;
         }
       }
-
+      
       // Record per-participant score for the current question so we can subtract it from
       // their displayed score until the host reveals the answer.
       for (const a of answers) {
@@ -264,7 +368,7 @@ export const getPlayerSessionData = query({
       .collect();
 
     // Group by participant and calculate total time
-    const participantTotalTimes: Record<string, number> = {};
+    const participantTotalTimes: Record<string, number> = {} as Record<string, number>;
     for (const answer of allSessionAnswers) {
       const pid = answer.participantId as string;
       participantTotalTimes[pid] = (participantTotalTimes[pid] || 0) + (answer.time_taken || 0);
@@ -272,8 +376,15 @@ export const getPlayerSessionData = query({
 
     // For players, hide the score gained from the current question until reveal
     const visibleParticipants = allParticipants.map((p) => {
-      const extra = currentQuestion ? (currentQuestionScores[p._id] || 0) : 0;
-      const visibleScore = session.reveal_answer ? p.score : Math.max(0, p.score - extra);
+    const extra = currentQuestion ? (currentQuestionScores[p._id] || 0) : 0;
+
+      const visibleScore =
+        session.status === "finished"
+          ? p.score
+          : session.reveal_answer
+          ? p.score
+          : Math.max(0, (p.score ?? 0) - extra);
+
       return { ...p, score: visibleScore, total_time: participantTotalTimes[p._id] || 0 };
     });
 
@@ -285,18 +396,47 @@ export const getPlayerSessionData = query({
 
     const visibleParticipant = (() => {
       const extra = currentQuestion ? (currentQuestionScores[participant._id] || 0) : 0;
-      const visibleScore = session.reveal_answer ? participant.score : Math.max(0, participant.score - extra);
+
+      const visibleScore =
+        session.status === "finished"
+          ? participant.score
+          : session.reveal_answer
+          ? participant.score
+          : Math.max(0, (participant.score ?? 0) - extra);
+
       return { ...participant, score: visibleScore };
     })();
 
     const quiz = await ctx.db.get(session.quizId);
 
     // Hide correct answer from client
-    const secureCurrentQuestion = currentQuestion ? {
+    const secureCurrentQuestion = currentQuestion
+    ? {
       ...currentQuestion,
-      correct_answer: session.reveal_answer ? currentQuestion.correct_answer : undefined,
-    } : null;
+      correct_answer:
+        session.mode === "mistake_mini"
+          ? currentQuestion.correct_answer
+          : session.reveal_answer
+          ? currentQuestion.correct_answer
+          : undefined,
+    }
+    : null;
 
+    // let originalScore = participant.score;
+    // if (session.mode === "mistake_mini") {
+    //   const originalSession = await ctx.db.get(session.originalSessionId);
+    //   if (originalSession) {
+    //     const originalParticipant = await ctx.db
+    //       .query("participants")
+    //       .withIndex("by_sessionId_score", q => q.eq("sessionId", originalSession._id))
+    //       .filter(q => q.eq(q.field("userId"), participant.userId))
+    //       .first();
+
+    //     if (originalParticipant) {
+    //       originalScore = originalParticipant.score;
+    //     }
+    //   }
+    // }
     return {
       session,
       quiz,
@@ -307,7 +447,132 @@ export const getPlayerSessionData = query({
       hasAnswered,
       submittedAnswer: answerDoc?.answer || null,
       lastTimeTaken: answerDoc?.time_taken || null,
-      totalQuestions: session.total_questions,
+      totalQuestions: questions.length,
+      questions,
+      participantAnswers,
+      originalAttemptData,
+    };
+  },
+});
+export const getMyAttempts = query({
+  handler: async (ctx) => {
+
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+
+    // Get all participants belonging to this user
+    const participants = await ctx.db
+      .query("participants")
+      .withIndex("by_userId", (q) => q.eq("userId", identity.subject))
+      .collect();
+
+    // Sort by creation time to ensure we process attempts in chronological order
+    participants.sort((a, b) => a._creationTime - b._creationTime);
+
+    const attempts = [];
+
+    for (const participant of participants) {
+      const session = await ctx.db.get(participant.sessionId);
+      if (!session || session.mode === "mistake_mini") continue;
+
+      const quiz = await ctx.db.get(session.quizId);
+      if (!quiz) continue;
+
+      attempts.push({
+        session,
+        participant,
+        quiz,
+        createdAt: participant._creationTime,
+      });
+    }
+
+    return attempts;
+  },
+})
+
+export const advanceMiniSession = mutation({
+  args: {
+    sessionId: v.id("quiz_sessions"),
+  },
+
+  handler: async (ctx, args) => {
+
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) throw new Error("Session not found");
+
+    if (session.mode !== "mistake_mini") {
+      throw new Error("Not a mini session");
+    }
+
+    const total = session.customQuestionIds?.length ?? 0;
+    const nextIndex = session.current_question_index + 1;
+
+    if (nextIndex >= total) {
+      await ctx.db.patch(args.sessionId, {
+        status: "finished",
+      });
+      return;
+    }
+
+    await ctx.db.patch(args.sessionId, {
+      current_question_index: nextIndex,
+    });
+  }
+});
+export const startReviewSession = query({
+  args: {
+    sessionId: v.id("quiz_sessions"),
+    participantId: v.id("participants"),
+  },
+
+  handler: async (ctx, args) => {
+
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) throw new Error("Session not found");
+
+    const participant = await ctx.db.get(args.participantId);
+    if (!participant) throw new Error("Participant not found");
+
+    // Fetch questions used in mini session
+    const questions = await Promise.all(
+      (session.customQuestionIds ?? []).map((qId) => ctx.db.get(qId))
+    );
+
+    const filteredQuestions = questions.filter(
+      (q): q is Doc<"questions"> => q !== null
+    );
+
+    // Fetch answers by this participant
+    const answers = await ctx.db
+      .query("answers")
+      .withIndex("by_participant_session", (q) =>
+        q.eq("participantId", args.participantId)
+         .eq("sessionId", args.sessionId)
+      )
+      .collect();
+
+    const answerMap = new Map(
+      answers.map((a) => [a.questionId, a])
+    );
+
+    const reviewData = filteredQuestions.map((q) => {
+
+      const userAnswer = answerMap.get(q._id);
+
+      return {
+        question: q,
+        userAnswer: userAnswer?.answer ?? null,
+        correctAnswer: q.correct_answer,
+        isCorrect: userAnswer?.is_correct ?? false,
+      };
+    });
+
+    return {
+      score: participant.score,
+      totalQuestions: filteredQuestions.length,
+      reviewData,
     };
   },
 });

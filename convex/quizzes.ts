@@ -92,7 +92,7 @@ export const editQuiz = mutation({
       description: args.description,
     });
 
-    // Delete existing questions (simple strategy: replace all)
+    // Delete existing questions 
     const existingQuestions = await ctx.db
       .query("questions")
       .withIndex("by_quizId_order", (q) => q.eq("quizId", args.quizId))

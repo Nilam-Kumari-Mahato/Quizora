@@ -17,6 +17,9 @@ import QuizDetails from "./pages/QuizDetails";
 import HostQuiz from "./pages/HostQuiz";
 import PlayQuiz from "./pages/PlayQuiz";
 import NotFound from "./pages/NotFound";
+import MyAttempts from "./pages/MyAttempts";
+import AttemptDetails from "./pages/AttemptDetails";
+
 
 const queryClient = new QueryClient();
 
@@ -36,7 +39,10 @@ const AppContent = () => {
           <Route path="/join" element={<JoinQuiz />} />
           <Route path="/quiz/:id" element={<QuizDetails />} />
           <Route path="/host/:sessionId" element={<HostQuiz />} />
+          <Route path="/review-mistakes/:sessionId" element={<PlayQuiz />} />
           <Route path="/play/:sessionId" element={<PlayQuiz />} />
+          <Route path="/my-attempts" element={<MyAttempts />} />
+          <Route path="/attempt/:sessionId" element={<AttemptDetails />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

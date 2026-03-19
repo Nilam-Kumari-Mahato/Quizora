@@ -1,12 +1,20 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom";
 import {
   AudioWaveform,
+  BookA,
   BookOpen,
   Bot,
   Command,
   Frame,
   GalleryVerticalEnd,
   Map,
+  NotebookPen,
+  PenBox,
+  PenLine,
+  PenOffIcon,
+  PenSquareIcon,
+  PercentSquare,
   PieChart,
   Settings2,
   SquareTerminal,
@@ -24,6 +32,10 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  SidebarGroup,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
 } from "@/components/ui/sidebar"
 
 // This is sample data.
@@ -43,7 +55,7 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Fetch quizzes created by the currently authenticated user
   const myQuizzes = useQuery(api.quizzes.getMyQuizzes);
-
+  const navigate = useNavigate();
   // Map the quizzes to nav items; when not loaded yet, keep the static placeholder
   const quizItems =
     myQuizzes && myQuizzes.length > 0
@@ -62,7 +74,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       items: quizItems,
     },
   ];
-
+const attempts = useQuery(api.sessions.getMyAttempts);
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -70,8 +82,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />
+        <SidebarGroup>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild>
+                <button
+                  onClick={() => navigate("/my-attempts")}
+                  className="flex items-center gap-2 w-full text-left"
+                >
+                  <BookOpen />
+                  <span>My Attempts</span>
+                </button>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
       </SidebarContent>
       <SidebarRail />
     </Sidebar>
   )
 }
+
+

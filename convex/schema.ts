@@ -61,6 +61,10 @@ export default defineSchema({
     //   clients compute  t_remaining = currentQuestionEndTime - Date.now()
     currentQuestionStartTime: v.optional(v.number()),
     currentQuestionEndTime: v.optional(v.number()),
+    mode: v.optional(v.string()),
+    customQuestionIds: v.optional(v.array(v.id("questions"))),
+    originalSessionId: v.optional(v.id("quiz_sessions")),
+    originalParticipantId: v.optional(v.id("participants")),
 
   }).index("by_join_code", ["join_code"]),
 
@@ -69,20 +73,35 @@ export default defineSchema({
     sessionId: v.id("quiz_sessions"),
     name: v.string(),
     score: v.number(),
+    userId:v.optional(v.string()),
   })
+    .index("by_userId", ["userId"])
     .index("by_sessionId_score", ["sessionId", "score"]),
+  // wrong answer table
+  participant_answers: defineTable({
+    sessionId: v.id("quiz_sessions"),
+    participantId: v.id("participants"),
+    questionId: v.id("questions"),
+    selected_answer: v.string(),
+    is_correct: v.boolean(),
+  })
+  .index("by_participant_session", ["participantId", "sessionId"])
+  .index("by_session", ["sessionId"]),
 
   // 'answers' table
   answers: defineTable({
     sessionId: v.id("quiz_sessions"),
     participantId: v.id("participants"),
     questionId: v.id("questions"),
-    answer: v.string(),
+    answer: v.string(), 
     is_correct: v.boolean(),
+    mode: v.optional(v.string()),
+    customQuestionIds: v.optional(v.array(v.id("questions"))),
     score: v.number(),
     time_taken: v.number(), // Time in seconds (validated client-side time)
   })
     .index("by_session_question", ["sessionId", "questionId"])
     .index("by_participant_question", ["participantId", "questionId"])
-    .index("by_session_question_time", ["sessionId", "questionId", "time_taken"]),
+    .index("by_session_question_time", ["sessionId", "questionId", "time_taken"])
+    .index("by_participant_session", ["participantId", "sessionId"]),
 });
