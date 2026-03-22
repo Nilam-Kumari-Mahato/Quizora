@@ -1,10 +1,11 @@
 // convex/gameplay.ts
-import { mutation } from "./_generated/server";
+import { mutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 
 const GRACE_PERIOD_MS = 5000;
 
-const checkHost = async (ctx: any, sessionId: any) => {
+const checkHost = async (ctx: MutationCtx, sessionId: Id<"quiz_sessions">) => {
   const [session, identity] = await Promise.all([
     ctx.db.get(sessionId),
     ctx.auth.getUserIdentity(),
@@ -25,22 +26,32 @@ export const startQuiz = mutation({
   handler: async (ctx, args) => {
     const session = await checkHost(ctx, args.sessionId);
 
+    if (session.total_questions === 0) {
+      throw new Error("No questions found for this quiz.");
+    }
+
+    // O(1) via index — fetch only the first question by order
     const firstQuestion = await ctx.db
       .query("questions")
-      .withIndex("by_quizId_order", (q) => q.eq("quizId", session.quizId))
-      .order("asc")
+      .withIndex("by_quizId_order", (q) =>
+        q.eq("quizId", session.quizId).eq("order_number", 0)
+      )
       .first();
 
     if (!firstQuestion) {
       throw new Error("No questions found for this quiz.");
     }
 
-    const timeLimitMs = firstQuestion.time_limit * 1000;
     const startTime = Date.now();
-    const endTime = startTime + timeLimitMs;
+    const endTime = startTime + firstQuestion.time_limit * 1000;
 
     await ctx.db.patch(args.sessionId, {
       status: "active",
+      current_question_index: 0,
+      current_question_id: firstQuestion._id,
+      show_leaderboard: false,
+      reveal_answer: false,
+      ended_early: false,
       currentQuestionStartTime: startTime,
       currentQuestionEndTime: endTime,
     });
@@ -54,18 +65,13 @@ export const showLeaderboard = mutation({
   handler: async (ctx, args) => {
     const session = await checkHost(ctx, args.sessionId);
 
-    // Get all questions to check if this is the last one
-    const questions = await ctx.db
-      .query("questions")
-      .withIndex("by_quizId_order", (q) => q.eq("quizId", session.quizId))
-      .order("asc")
-      .collect();
-
-    // If we're on the last question, go directly to finished state
-    if (session.current_question_index === questions.length - 1) {
+    // O(1) — use cached total_questions instead of querying the questions table
+    if (session.current_question_index === session.total_questions - 1) {
+      // Last question → finish the quiz
       await ctx.db.patch(args.sessionId, {
         status: "finished",
         show_leaderboard: false,
+        current_question_id: undefined,
         currentQuestionStartTime: undefined,
         currentQuestionEndTime: undefined,
       });
@@ -83,36 +89,37 @@ export const nextQuestion = mutation({
   handler: async (ctx, args) => {
     const session = await checkHost(ctx, args.sessionId);
 
-    const questions = await ctx.db
-      .query("questions")
-      .withIndex("by_quizId_order", (q) => q.eq("quizId", session.quizId))
-      .order("asc")
-      .collect();
-
     const nextIndex = session.current_question_index + 1;
 
-    // If we're currently on the last question, go directly to finished state
-    if (session.current_question_index === questions.length - 1) {
+    // O(1) — compare against cached total_questions
+    if (session.current_question_index === session.total_questions - 1) {
+      // Already on the last question → finish
       await ctx.db.patch(args.sessionId, {
         status: "finished",
         show_leaderboard: false,
-        currentQuestionStartTime: undefined,
-        currentQuestionEndTime: undefined,
-      });
-    } else if (nextIndex >= questions.length) {
-      await ctx.db.patch(args.sessionId, {
-        status: "finished",
+        current_question_id: undefined,
         currentQuestionStartTime: undefined,
         currentQuestionEndTime: undefined,
       });
     } else {
-      const nextQuestion = questions[nextIndex];
-      const timeLimitMs = nextQuestion.time_limit * 1000;
+      // O(1) via composite index — fetch only the next question
+      const nextQ = await ctx.db
+        .query("questions")
+        .withIndex("by_quizId_order", (q) =>
+          q.eq("quizId", session.quizId).eq("order_number", nextIndex)
+        )
+        .first();
+
+      if (!nextQ) {
+        throw new Error("Next question not found.");
+      }
+
       const startTime = Date.now();
-      const endTime = startTime + timeLimitMs;
+      const endTime = startTime + nextQ.time_limit * 1000;
 
       await ctx.db.patch(args.sessionId, {
         current_question_index: nextIndex,
+        current_question_id: nextQ._id,
         show_leaderboard: false,
         reveal_answer: false,
         currentQuestionStartTime: startTime,
@@ -145,6 +152,7 @@ export const endQuiz = mutation({
       status: "finished",
       show_leaderboard: false,
       ended_early: true,
+      current_question_id: undefined,
       currentQuestionStartTime: undefined,
       currentQuestionEndTime: undefined,
     });
@@ -165,7 +173,7 @@ export const submitAnswer = mutation({
   },
 
   handler: async (ctx, args) => {
-    const { participantId, questionId, sessionId, answer, time_taken } = args;
+    const { participantId, questionId, sessionId, answer } = args;
 
     const participant = await ctx.db.get(participantId);
     if (!participant) throw new Error("Participant not found");
@@ -176,7 +184,26 @@ export const submitAnswer = mutation({
     const session = await ctx.db.get(sessionId);
     if (!session) throw new Error("Session not found");
 
-    const isMiniMode = session.mode === "mistake_mini";
+    if (participant.sessionId !== sessionId) {
+      throw new Error("Participant does not belong to this session");
+    }
+
+    if (session.status !== "active") {
+      return { success: false, reason: "session_not_active" as const };
+    }
+
+    if (session.current_question_id && session.current_question_id !== questionId) {
+      return { success: false, reason: "stale_question" as const };
+    }
+
+    if (!session.currentQuestionStartTime || !session.currentQuestionEndTime) {
+      return { success: false, reason: "timer_not_initialized" as const };
+    }
+
+    const now = Date.now();
+    if (now > session.currentQuestionEndTime + GRACE_PERIOD_MS) {
+      return { success: false, reason: "time_up" as const };
+    }
 
    const existingAnswer = await ctx.db
     .query("answers")
@@ -194,6 +221,13 @@ export const submitAnswer = mutation({
     const is_correct = question.correct_answer === answer;
     const score = is_correct ? 1 : 0;
 
+    // We will use server clock for deterministic timing and clamp to timer end.
+    const effectiveSubmitTime = Math.min(now, session.currentQuestionEndTime);
+    const serverTimeTaken = Math.max(
+      0,
+      (effectiveSubmitTime - session.currentQuestionStartTime) / 1000
+    );
+
     await ctx.db.insert("answers", {
       sessionId,
       participantId,
@@ -201,7 +235,7 @@ export const submitAnswer = mutation({
       answer,
       is_correct,
       score,
-      time_taken,
+      time_taken: serverTimeTaken,
     });
 
     if (score > 0) {
