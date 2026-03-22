@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 // Helper function to generate a 6-character join code
@@ -11,12 +11,12 @@ const generateJoinCode = () => {
   return result;
 };
 
-const generateUniqueJoinCode = async (ctx: any) => {
+const generateUniqueJoinCode = async (ctx: MutationCtx) => {
   for (let i = 0; i < 10; i++) {
     const candidate = generateJoinCode();
     const exists = await ctx.db
       .query("quiz_sessions")
-      .withIndex("by_join_code", (q:any) => q.eq("join_code", candidate))
+      .withIndex("by_join_code", (q) => q.eq("join_code", candidate))
       .first();
     if (!exists) {
       return candidate;
@@ -239,6 +239,14 @@ export const createMistakeMiniSession = mutation({
       return { sessionId: null, join_code: null };
     }
 
+    const firstQuestionId = mistakeQuestionIds[0];
+    const firstQuestion = await ctx.db.get(firstQuestionId);
+    if (!firstQuestion) {
+      throw new Error("First mini-session question not found");
+    }
+
+    const startTime = Date.now();
+    const endTime = startTime + firstQuestion.time_limit * 1000;
     const join_code = await generateUniqueJoinCode(ctx);
 
     const newSessionId = await ctx.db.insert("quiz_sessions", {
@@ -249,8 +257,12 @@ export const createMistakeMiniSession = mutation({
       mode: "mistake_mini",
       current_question_index: 0,
       show_leaderboard: false,
+      reveal_answer: false,
+      total_questions: mistakeQuestionIds.length,
+      current_question_id: firstQuestionId,
       customQuestionIds: mistakeQuestionIds,
-      currentQuestionStartTime: Date.now(),
+      currentQuestionStartTime: startTime,
+      currentQuestionEndTime: endTime,
       // Propagate original attempt info to show score correctly in mini-mode
       originalSessionId: originalSession.originalSessionId ?? args.originalSessionId,
       originalParticipantId: originalSession.originalParticipantId ?? args.participantId,
@@ -267,6 +279,15 @@ export const getPlayerSessionData = query({
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
     if (!session) return null;
+
+    const totalQuestions =
+      session.total_questions ??
+      (session.mode === "mistake_mini"
+        ? session.customQuestionIds?.length ?? 0
+        : (await ctx.db
+            .query("questions")
+            .withIndex("by_quizId_order", (q) => q.eq("quizId", session.quizId))
+            .collect()).length);
     const participantAnswers = await ctx.db
     .query("answers")
     .withIndex("by_participant_session", (q) =>
@@ -287,27 +308,26 @@ export const getPlayerSessionData = query({
       }
     }
 
-    let questions: Doc<"questions">[] = [];
+    let currentQuestion = session.current_question_id
+      ? await ctx.db.get(session.current_question_id)
+      : null;
 
+    // Backward compatibility for legacy sessions that don't have current_question_id populated.
+    if (!currentQuestion && session.status === "active") {
       if (session.mode === "mistake_mini" && session.customQuestionIds) {
-        const fetched = await Promise.all(
-          session.customQuestionIds.map((id) => ctx.db.get(id))
-        );
-
-        questions = fetched.filter((q): q is Doc<"questions"> => q !== null);
-
+        const fallbackQuestionId = session.customQuestionIds[session.current_question_index];
+        if (fallbackQuestionId) {
+          currentQuestion = await ctx.db.get(fallbackQuestionId);
+        }
       } else {
-
-        questions = await ctx.db
+        currentQuestion = await ctx.db
           .query("questions")
           .withIndex("by_quizId_order", (q) =>
-            q.eq("quizId", session.quizId)
+            q.eq("quizId", session.quizId).eq("order_number", session.current_question_index)
           )
-          .collect();
+          .first();
       }
-
-
-    const currentQuestion = questions[session.current_question_index] || null;
+    }
 
     const allParticipants = await ctx.db
       .query("participants")
@@ -447,8 +467,8 @@ export const getPlayerSessionData = query({
       hasAnswered,
       submittedAnswer: answerDoc?.answer || null,
       lastTimeTaken: answerDoc?.time_taken || null,
-      totalQuestions: questions.length,
-      questions,
+      totalQuestions,
+      questions: [],
       participantAnswers,
       originalAttemptData,
     };
@@ -512,12 +532,32 @@ export const advanceMiniSession = mutation({
     if (nextIndex >= total) {
       await ctx.db.patch(args.sessionId, {
         status: "finished",
+        current_question_id: undefined,
+        currentQuestionStartTime: undefined,
+        currentQuestionEndTime: undefined,
       });
       return;
     }
 
+    const nextQuestionId = session.customQuestionIds?.[nextIndex];
+    if (!nextQuestionId) {
+      throw new Error("Next mini-session question not found");
+    }
+
+    const nextQuestion = await ctx.db.get(nextQuestionId);
+    if (!nextQuestion) {
+      throw new Error("Next mini-session question not found");
+    }
+
+    const startTime = Date.now();
+    const endTime = startTime + nextQuestion.time_limit * 1000;
+
     await ctx.db.patch(args.sessionId, {
       current_question_index: nextIndex,
+      current_question_id: nextQuestionId,
+      reveal_answer: false,
+      currentQuestionStartTime: startTime,
+      currentQuestionEndTime: endTime,
     });
   }
 });
