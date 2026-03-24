@@ -72,7 +72,7 @@ export default function AttemptDetails() {
 
   console.log("og score: ",originalScore)
   return (
-      // <div className="p-6 space-y-4">
+      // <div className="p-10 space-y-4">
       //   <h1 className="text-2xl font-bold">{data.quiz.title}</h1>
 
       //   <p className="text-sm text-muted-foreground">
