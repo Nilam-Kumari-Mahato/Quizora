@@ -37,10 +37,15 @@ const PlayQuiz = () => {
   const { toast } = useToast();
   const { isSignedIn } = useAuth();
   const advanceMiniSession = useMutation(api.sessions.advanceMiniSession);
-  const startReviewSession = useQuery(api.sessions.startReviewSession, {
-  sessionId: sessionId as Id<"quiz_sessions">,
-  participantId: participantId as Id<"participants">
-  });
+  const startReviewSession = useQuery(
+    api.sessions.startReviewSession,
+    reviewMode && sessionId && participantId
+      ? {
+          sessionId: sessionId as Id<"quiz_sessions">,
+          participantId: participantId as Id<"participants">,
+        }
+      : "skip"
+  );
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [miniFeedback, setMiniFeedback] = useState({
     show: false,
