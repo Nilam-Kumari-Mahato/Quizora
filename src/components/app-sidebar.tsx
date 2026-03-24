@@ -74,7 +74,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       items: quizItems,
     },
   ];
-const attempts = useQuery(api.sessions.getMyAttempts);
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>

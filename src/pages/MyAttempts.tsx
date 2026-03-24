@@ -20,7 +20,7 @@ export default function MyAttempts() {
   }
   const uniqueAttempts = Array.from(uniqueAttemptsMap.values());
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-14 space-y-4">
       <h1 className="text-2xl font-bold">My Attempts</h1>
 
       {uniqueAttempts.length === 0 && (
