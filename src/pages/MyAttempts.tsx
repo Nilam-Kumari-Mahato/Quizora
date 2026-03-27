@@ -21,7 +21,7 @@ export default function MyAttempts() {
   const uniqueAttempts = Array.from(uniqueAttemptsMap.values());
   return (
     <div className="p-14 space-y-4">
-      <h1 className="text-2xl font-bold">My Attempts</h1>
+      <h1 className="text-3xl font-bold px-5">My Attempts</h1>
 
       {uniqueAttempts.length === 0 && (
         <p>No attempts yet.</p>
@@ -30,18 +30,18 @@ export default function MyAttempts() {
       {uniqueAttempts.map((a: any) => (
         <Card
           key={a.participant._id}
-          className="p-4 flex justify-between items-center"
+          className="px-8 py-4 flex justify-between items-center"
         >
           <div>
             <h2 className="font-semibold text-lg">
               {a.quiz.title}
             </h2>
 
-            <p className="text-sm text-muted-foreground">
+            <p className="text-md text-muted-foreground">
               Score: {a.participant.score}
             </p>
 
-            <p className="text-xs text-muted-foreground">
+            <p className="text-md text-muted-foreground">
               {formatDistanceToNow(new Date(a.createdAt))} ago
             </p>
           </div>

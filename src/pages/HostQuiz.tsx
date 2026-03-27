@@ -9,7 +9,7 @@ import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
-import { Progress } from "@chakra-ui/react"
+import { Progress } from "@chakra-ui/react";
 
 const HostQuiz = () => {
   const { sessionId } = useParams();
@@ -394,23 +394,23 @@ const HostQuiz = () => {
               <Trophy className="h-14 w-14 md:h-16 md:w-16 lg:h-20 lg:w-20 mx-auto mb-4 text-warning" />
               <h2 className="text-xl sm:text-xl md:text-2xl lg:text-2xl xl:text-3xl font-bold mb-6 dark:text-zinc-100">Leaderboard</h2>
               <div className="flex justify-between gap-1 sm:gap-2 mb-2">
-                  <Button
-                    onClick={endQuiz}
-                    size="sm"
-                    variant="ghost"
-                    className="px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm md:px-4 md:py-2 md:text-base rounded-full hover:bg-muted/70 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-white/70 opacity-70"
-                  >
-                    End Quiz
-                  </Button>
-                  <Button
-                    onClick={nextQuestion}
-                    size="sm"
-                    variant="ghost"
-                    className="px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm md:px-4 md:py-2 md:text-base rounded-full hover:bg-muted/50 hover:text-orange-300 opacity-70"
-                  >
-                    Next
-                  </Button>
-                </div>
+                <Button
+                  onClick={endQuiz}
+                  size="sm"
+                  variant="ghost"
+                  className="px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm md:px-4 md:py-2 md:text-base rounded-full hover:bg-muted/70 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-white/70 opacity-70"
+                >
+                  End Quiz
+                </Button>
+                <Button
+                  onClick={nextQuestion}
+                  size="sm"
+                  variant="ghost"
+                  className="px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm md:px-4 md:py-2 md:text-base rounded-full hover:bg-muted/50 hover:text-orange-300 opacity-70"
+                >
+                  Next <SkipForward className="h-4 w-4" />
+                </Button>
+              </div>
 
               <div className="space-y-3 mb-8 dark:text-zinc-300">
                 {participants?.map((p, i) => (
