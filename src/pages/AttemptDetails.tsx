@@ -6,7 +6,7 @@ import { Id } from "../../convex/_generated/dataModel";
 
 
 export default function AttemptDetails() {
-   const { sessionId } = useParams();
+  const { sessionId } = useParams();
   const [searchParams] = useSearchParams();
   const participantId = searchParams.get("participant");
 
@@ -16,9 +16,9 @@ export default function AttemptDetails() {
     api.sessions.getPlayerSessionData,
     sessionId && participantId
       ? {
-          sessionId: sessionId as Id<"quiz_sessions">,
-          participantId: participantId as Id<"participants">
-        }
+        sessionId: sessionId as Id<"quiz_sessions">,
+        participantId: participantId as Id<"participants">
+      }
       : "skip"
   );
   const createMistakeMiniSession = useMutation(
@@ -65,59 +65,59 @@ export default function AttemptDetails() {
   };
 
   const originalScore =
-  data.participantAnswers?.filter((a: any) => a.is_correct)?.length || 0;
-  
+    data.participantAnswers?.filter((a: any) => a.is_correct)?.length || 0;
+
   const questions = (data as any).questions || [];
   const participantAnswers = (data as any).participantAnswers || [];
 
-  console.log("og score: ",originalScore)
+  console.log("og score: ", originalScore)
   return (
-      // <div className="p-10 space-y-4">
-      //   <h1 className="text-2xl font-bold">{data.quiz.title}</h1>
+    // <div className="p-10 space-y-4">
+    //   <h1 className="text-2xl font-bold">{data.quiz.title}</h1>
 
-      //   <p className="text-sm text-muted-foreground">
-      //     Score: {data.participant.score} / {data.totalQuestions}
-      //   </p>
+    //   <p className="text-sm text-muted-foreground">
+    //     Score: {data.participant.score} / {data.totalQuestions}
+    //   </p>
 
-      //   {data.participant.score < data.totalQuestions && (
-      //     <Button onClick={handleRetryMistakes}>
-      //       Fix My Mistakes
-      //     </Button>
-      //   )}
-      <div className="max-w-4xl mx-auto px-6 pt-12 space-y-8">
+    //   {data.participant.score < data.totalQuestions && (
+    //     <Button onClick={handleRetryMistakes}>
+    //       Fix My Mistakes
+    //     </Button>
+    //   )}
+    <div className="max-w-4xl mx-auto px-6 pt-12 space-y-8">
 
-    {/* Title */}
-    <div>
-      <h1 className="text-3xl font-bold">{data.quiz.title}</h1>
-      <p className="text-muted-foreground mt-1">
-        Attempt Review
-      </p>
-    </div>
-
-    {/* Score Summary */}
-    <div className="border rounded-xl p-6 flex items-center justify-between">
-
+      {/* Title */}
       <div>
-        <p className="text-sm text-muted-foreground">Original Quiz Score</p>
-        <p className="text-2xl font-semibold">
-          {originalScore} / {data.totalQuestions}
+        <h1 className="text-3xl font-bold">{data.quiz.title}</h1>
+        <p className="text-muted-foreground mt-1">
+          Attempt Review
         </p>
       </div>
 
-      {data.participant.score < data.totalQuestions && (
-        <Button onClick={handleRetryMistakes}>
-          Fix My Mistakes
-        </Button>
-      )}
+      {/* Score Summary */}
+      <div className="border rounded-xl p-6 flex items-center justify-between">
 
-    </div>
+        <div>
+          <p className="text-sm text-muted-foreground">Original Quiz Score</p>
+          <p className="text-2xl font-semibold">
+            {originalScore} / {data.totalQuestions}
+          </p>
+        </div>
 
-    {/* Placeholder for Analytics */}
-    <div className="border rounded-xl p-6 bg-muted/30">
-      <p className="text-sm text-muted-foreground">
-        Analytics section will appear here
-      </p>
-    </div>
+        {data.participant.score < data.totalQuestions && (
+          <Button onClick={handleRetryMistakes}>
+            Fix My Mistakes
+          </Button>
+        )}
+
       </div>
+
+      {/* Placeholder for Analytics */}
+      <div className="border rounded-xl p-6 bg-muted/30">
+        <p className="text-sm text-muted-foreground">
+          Analytics section coming soon...
+        </p>
+      </div>
+    </div>
   );
 }
