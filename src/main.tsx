@@ -8,7 +8,7 @@ import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { Provider } from "@/components/ui/provider";
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
-const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
+const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ;
 
 if (!publishableKey) {
   throw new Error("Missing Clerk Publishable Key in .env");
